@@ -1,0 +1,53 @@
+# ============================================
+# .dockerignore File
+# ============================================
+# Like .gitignore, but for Docker builds
+# Files/folders listed here are NOT copied into the Docker image
+# This makes builds faster and images smaller
+
+# Maven build output
+# We rebuild inside Docker, so don't copy old builds
+target/
+
+# IDE files (IntelliJ IDEA)
+.idea/
+*.iml
+*.iws
+
+# IDE files (Eclipse)
+.classpath
+.project
+.settings/
+
+# IDE files (VS Code)
+.vscode/
+
+# macOS system files
+.DS_Store
+
+# Git repository (not needed in Docker image)
+.git/
+.gitignore
+
+# Documentation (not needed in Docker image)
+*.md
+!README.md
+
+# Test reports
+test-results/
+*.log
+
+# Docker files themselves (don't need to copy into image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Environment files (may contain secrets)
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~

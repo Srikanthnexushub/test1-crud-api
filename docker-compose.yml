@@ -1,0 +1,156 @@
+# ============================================
+# Docker Compose Configuration
+# ============================================
+# Docker Compose orchestrates multiple containers
+# Here: Spring Boot app + PostgreSQL database
+
+# version: Docker Compose file format version
+version: '3.8'
+
+# services: Define the containers you want to run
+services:
+
+  # ============================================
+  # PostgreSQL Database Container
+  # ============================================
+  postgres:
+    # image: Use official PostgreSQL version 15 from Docker Hub
+    image: postgres:15-alpine
+
+    # container_name: Give the container a friendly name
+    # Without this, Docker generates random names like "test1_postgres_1"
+    container_name: crud_postgres_db
+
+    # environment: Set environment variables inside the container
+    # PostgreSQL reads these to configure itself
+    environment:
+      # POSTGRES_DB: Name of the database to create automatically
+      POSTGRES_DB: cruddb
+
+      # POSTGRES_USER: Username for database access
+      POSTGRES_USER: postgres
+
+      # POSTGRES_PASSWORD: Password for the user
+      POSTGRES_PASSWORD: postgres
+
+      # PGDATA: Where PostgreSQL stores data inside container
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    # ports: Map container port to your machine's port
+    # Format: "host_port:container_port"
+    # 5432:5432 means:
+    #   - PostgreSQL runs on port 5432 inside container
+    #   - Accessible on port 5432 on your machine (localhost:5432)
+    ports:
+      - "5432:5432"
+
+    # volumes: Persist data even when container stops
+    # Without volumes, data is lost when container stops
+    # postgres_data:/var/lib/postgresql/data/pgdata means:
+    #   - Create a named volume called "postgres_data"
+    #   - Mount it to /var/lib/postgresql/data/pgdata in container
+    #   - Data survives container restarts
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/pgdata
+
+    # networks: Connect this container to a network
+    # Containers on same network can talk to each other by name
+    networks:
+      - crud_network
+
+    # healthcheck: Check if PostgreSQL is ready
+    # Docker will mark container as "healthy" only when this succeeds
+    healthcheck:
+      # test: Command to check health
+      # pg_isready checks if PostgreSQL accepts connections
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+
+      # interval: How often to check (every 10 seconds)
+      interval: 10s
+
+      # timeout: How long to wait for response (5 seconds)
+      timeout: 5s
+
+      # retries: Try 5 times before marking as unhealthy
+      retries: 5
+
+  # ============================================
+  # Spring Boot Application Container
+  # ============================================
+  app:
+    # build: Build image from Dockerfile
+    # context: Build context (current directory = .)
+    # dockerfile: Name of the Dockerfile to use
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # container_name: Friendly name for the app container
+    container_name: crud_spring_app
+
+    # depends_on: Start postgres before starting app
+    # condition: Wait until postgres is "healthy" (healthcheck passes)
+    # This ensures database is ready before app tries to connect
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # environment: Override Spring Boot properties
+    # These override values in application.properties
+    environment:
+      # SPRING_DATASOURCE_URL: Database connection URL
+      # jdbc:postgresql://postgres:5432/cruddb
+      #   - postgres: hostname (name of postgres service above)
+      #   - 5432: PostgreSQL port
+      #   - cruddb: database name
+      # Docker's internal DNS resolves "postgres" to the IP of postgres container
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cruddb
+
+      # SPRING_DATASOURCE_USERNAME: Database username
+      SPRING_DATASOURCE_USERNAME: postgres
+
+      # SPRING_DATASOURCE_PASSWORD: Database password
+      SPRING_DATASOURCE_PASSWORD: postgres
+
+      # SPRING_JPA_HIBERNATE_DDL_AUTO: Auto-create tables from entities
+      # update = create/update tables automatically
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+
+      # SPRING_JPA_SHOW_SQL: Log SQL queries (useful for debugging)
+      SPRING_JPA_SHOW_SQL: "true"
+
+    # ports: Map application port
+    # 8080:8080 means:
+    #   - Spring Boot runs on 8080 inside container
+    #   - Accessible on http://localhost:8080 on your machine
+    ports:
+      - "8080:8080"
+
+    # networks: Same network as postgres
+    # This allows app to reach postgres by name
+    networks:
+      - crud_network
+
+    # restart: Restart policy
+    # unless-stopped = always restart unless you manually stop it
+    restart: unless-stopped
+
+# ============================================
+# Networks Definition
+# ============================================
+# Define custom networks for container communication
+networks:
+  # crud_network: Custom bridge network
+  # Containers can communicate using service names as hostnames
+  crud_network:
+    driver: bridge
+
+# ============================================
+# Volumes Definition
+# ============================================
+# Define named volumes for data persistence
+volumes:
+  # postgres_data: Stores PostgreSQL database files
+  # Data persists even if container is deleted
+  postgres_data:
+    driver: local
