@@ -1,6 +1,7 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.config.TestSecurityConfig;
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
 import org.example.entity.UserEntity;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestSecurityConfig.class)
 @TestPropertySource(locations = "classpath:application-test.properties")
 @DisplayName("User Integration Tests")
 class UserIntegrationTest {

@@ -1,0 +1,64 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< org.example:Crud_Operation >---------------------
+[INFO] Building Crud Operation 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ Crud_Operation ---
+[INFO] Deleting /Users/ainexusstudio/Documents/GitHub/test1/target
+[INFO] 
+[INFO] --- jacoco:0.8.11:prepare-agent (prepare-agent) @ Crud_Operation ---
+[INFO] argLine set to -javaagent:/Users/ainexusstudio/.m2/repository/org/jacoco/org.jacoco.agent/0.8.11/org.jacoco.agent-0.8.11-runtime.jar=destfile=/Users/ainexusstudio/Documents/GitHub/test1/target/jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ Crud_Operation ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ Crud_Operation ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 35 source files with javac [debug release 17] to target/classes
+[INFO] /Users/ainexusstudio/Documents/GitHub/test1/src/main/java/org/example/security/RateLimitingFilter.java: /Users/ainexusstudio/Documents/GitHub/test1/src/main/java/org/example/security/RateLimitingFilter.java uses or overrides a deprecated API.
+[INFO] /Users/ainexusstudio/Documents/GitHub/test1/src/main/java/org/example/security/RateLimitingFilter.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ Crud_Operation ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ Crud_Operation ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 18 source files with javac [debug release 17] to target/test-classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /Users/ainexusstudio/Documents/GitHub/test1/src/test/java/org/example/integration/UserServiceRepositoryIntegrationTest.java:[44,23] constructor UserService in class org.example.service.UserService cannot be applied to given types;
+  required: org.example.repository.UserRepository,org.example.repository.RoleRepository,org.springframework.security.crypto.password.PasswordEncoder,org.example.security.JwtUtil,org.example.service.AuditLogService,org.example.service.RefreshTokenService
+  found:    org.example.repository.UserRepository
+  reason: actual and formal argument lists differ in length
+[ERROR] /Users/ainexusstudio/Documents/GitHub/test1/src/test/java/org/example/integration/TransactionBoundaryIntegrationTest.java:[45,23] constructor UserService in class org.example.service.UserService cannot be applied to given types;
+  required: org.example.repository.UserRepository,org.example.repository.RoleRepository,org.springframework.security.crypto.password.PasswordEncoder,org.example.security.JwtUtil,org.example.service.AuditLogService,org.example.service.RefreshTokenService
+  found:    org.example.repository.UserRepository
+  reason: actual and formal argument lists differ in length
+[INFO] 2 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.219 s
+[INFO] Finished at: 2026-02-03T17:34:45+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:testCompile (default-testCompile) on project Crud_Operation: Compilation failure: Compilation failure: 
+[ERROR] /Users/ainexusstudio/Documents/GitHub/test1/src/test/java/org/example/integration/UserServiceRepositoryIntegrationTest.java:[44,23] constructor UserService in class org.example.service.UserService cannot be applied to given types;
+[ERROR]   required: org.example.repository.UserRepository,org.example.repository.RoleRepository,org.springframework.security.crypto.password.PasswordEncoder,org.example.security.JwtUtil,org.example.service.AuditLogService,org.example.service.RefreshTokenService
+[ERROR]   found:    org.example.repository.UserRepository
+[ERROR]   reason: actual and formal argument lists differ in length
+[ERROR] /Users/ainexusstudio/Documents/GitHub/test1/src/test/java/org/example/integration/TransactionBoundaryIntegrationTest.java:[45,23] constructor UserService in class org.example.service.UserService cannot be applied to given types;
+[ERROR]   required: org.example.repository.UserRepository,org.example.repository.RoleRepository,org.springframework.security.crypto.password.PasswordEncoder,org.example.security.JwtUtil,org.example.service.AuditLogService,org.example.service.RefreshTokenService
+[ERROR]   found:    org.example.repository.UserRepository
+[ERROR]   reason: actual and formal argument lists differ in length
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -6,6 +6,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.example.config.TestSecurityConfig;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.TestPropertySource;
 
@@ -14,6 +16,7 @@ import org.springframework.test.context.TestPropertySource;
  * Uses Playwright's APIRequestContext for testing REST APIs.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(TestSecurityConfig.class)
 @TestPropertySource(locations = "classpath:application-test.properties")
 public abstract class BaseE2ETest {
 

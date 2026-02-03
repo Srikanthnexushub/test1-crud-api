@@ -2,8 +2,13 @@ package org.example.integration;
 
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.entity.Role;
 import org.example.entity.UserEntity;
+import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
+import org.example.security.JwtUtil;
+import org.example.service.AuditLogService;
+import org.example.service.RefreshTokenService;
 import org.example.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +26,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Integration tests for transaction boundary and rollback scenarios.
@@ -39,13 +49,40 @@ class TransactionBoundaryIntegrationTest {
     private TestEntityManager entityManager;
 
     private UserService userService;
+    private RoleRepository roleRepository;
+    private PasswordEncoder passwordEncoder;
+    private JwtUtil jwtUtil;
+    private AuditLogService auditLogService;
+    private RefreshTokenService refreshTokenService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository);
         userRepository.deleteAll();
         entityManager.flush();
         entityManager.clear();
+
+        // Create mocks for new dependencies
+        roleRepository = mock(RoleRepository.class);
+        passwordEncoder = new BCryptPasswordEncoder();
+        jwtUtil = mock(JwtUtil.class);
+        auditLogService = mock(AuditLogService.class);
+        refreshTokenService = mock(RefreshTokenService.class);
+
+        // Mock default role for registration
+        Role defaultRole = new Role(Role.RoleName.ROLE_USER, "Standard user");
+        when(roleRepository.findByName(Role.RoleName.ROLE_USER)).thenReturn(Optional.of(defaultRole));
+
+        // Mock JWT token generation
+        when(jwtUtil.generateToken(anyString())).thenReturn("mock-jwt-token");
+
+        // Mock refresh token service
+        org.example.entity.RefreshToken mockRefreshToken = new org.example.entity.RefreshToken();
+        mockRefreshToken.setToken("mock-refresh-token");
+        when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
+
+        // Manually instantiate UserService with all dependencies
+        userService = new UserService(userRepository, roleRepository, passwordEncoder,
+                                     jwtUtil, auditLogService, refreshTokenService);
     }
 
     // ========== CONSTRAINT VIOLATION TESTS ==========
@@ -199,7 +236,8 @@ class TransactionBoundaryIntegrationTest {
         Optional<UserEntity> updatedUser = userRepository.findById(userId);
         assertThat(updatedUser).isPresent();
         assertThat(updatedUser.get().getEmail()).isEqualTo("after@example.com");
-        assertThat(updatedUser.get().getPassword()).isEqualTo("newPassword");
+        // Password should be BCrypt hashed after going through UserService
+        assertThat(passwordEncoder.matches("newPassword", updatedUser.get().getPassword())).isTrue();
     }
 
     // ========== MULTIPLE OPERATIONS IN TRANSACTION TESTS ==========

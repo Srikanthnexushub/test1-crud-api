@@ -2,8 +2,13 @@ package org.example.integration;
 
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.entity.Role;
 import org.example.entity.UserEntity;
+import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
+import org.example.security.JwtUtil;
+import org.example.service.AuditLogService;
+import org.example.service.RefreshTokenService;
 import org.example.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,12 +16,19 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.example.util.TestDataBuilder.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Integration tests for UserService with real database (UserRepository).
@@ -37,13 +49,39 @@ class UserServiceRepositoryIntegrationTest {
     private TestEntityManager entityManager;
 
     private UserService userService;
+    private RoleRepository roleRepository;
+    private PasswordEncoder passwordEncoder;
+    private JwtUtil jwtUtil;
+    private AuditLogService auditLogService;
+    private RefreshTokenService refreshTokenService;
 
     @BeforeEach
     void setUp() {
-        // Manually instantiate UserService with real repository
-        userService = new UserService(userRepository);
         // Clean database before each test
         userRepository.deleteAll();
+
+        // Create mocks for new dependencies
+        roleRepository = mock(RoleRepository.class);
+        passwordEncoder = new BCryptPasswordEncoder();
+        jwtUtil = mock(JwtUtil.class);
+        auditLogService = mock(AuditLogService.class);
+        refreshTokenService = mock(RefreshTokenService.class);
+
+        // Mock default role for registration
+        Role defaultRole = new Role(Role.RoleName.ROLE_USER, "Standard user");
+        when(roleRepository.findByName(Role.RoleName.ROLE_USER)).thenReturn(Optional.of(defaultRole));
+
+        // Mock JWT token generation
+        when(jwtUtil.generateToken(anyString())).thenReturn("mock-jwt-token");
+
+        // Mock refresh token service
+        org.example.entity.RefreshToken mockRefreshToken = new org.example.entity.RefreshToken();
+        mockRefreshToken.setToken("mock-refresh-token");
+        when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
+
+        // Manually instantiate UserService with all dependencies
+        userService = new UserService(userRepository, roleRepository, passwordEncoder,
+                                     jwtUtil, auditLogService, refreshTokenService);
     }
 
     // ========== REGISTRATION TESTS ==========
@@ -127,7 +165,8 @@ class UserServiceRepositoryIntegrationTest {
         // Verify special characters persisted correctly
         Optional<UserEntity> savedUser = userRepository.findByEmail("special@example.com");
         assertThat(savedUser).isPresent();
-        assertThat(savedUser.get().getPassword()).isEqualTo(specialPassword);
+        // Password should be BCrypt hashed, not plain text
+        assertThat(passwordEncoder.matches(specialPassword, savedUser.get().getPassword())).isTrue();
     }
 
     // ========== LOGIN TESTS ==========
