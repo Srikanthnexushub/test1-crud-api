@@ -420,3 +420,55 @@ For support, email support@example.com or open an issue in the GitHub repository
 **Built with ❤️ using Spring Boot and modern enterprise practices**
 
 **Status**: ✅ Production Ready | 🧪 100% Test Coverage | 🔒 Enterprise Security | 🚀 Docker Ready
+
+## 🔐 Security Notice
+
+### ⚠️ IMPORTANT: Environment Variables Required
+
+This application requires environment variables for sensitive credentials. **NEVER commit credentials to version control!**
+
+#### Quick Setup
+
+1. **Copy the example environment file:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Generate a secure JWT secret:**
+   ```bash
+   openssl rand -base64 32
+   ```
+
+3. **Edit `.env` with your credentials:**
+   ```bash
+   DATABASE_PASSWORD=your_secure_password
+   JWT_SECRET=your_generated_secret_from_step_2
+   ```
+
+4. **Run the application:**
+   ```bash
+   mvn spring-boot:run
+   ```
+
+#### Environment Variables
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `DATABASE_PASSWORD` | PostgreSQL password | Yes | `SecureP@ssw0rd!` |
+| `JWT_SECRET` | JWT signing key (256-bit) | Yes | Generate with `openssl rand -base64 32` |
+| `DATABASE_URL` | Database connection URL | No | `jdbc:postgresql://localhost:5433/Crud_db` |
+| `DATABASE_USERNAME` | Database username | No | `postgres` |
+
+### GitGuardian Security Alert Resolution
+
+If you received a GitGuardian alert about exposed credentials:
+
+1. **✅ Fixed**: All credentials now use environment variables
+2. **🔄 Required Action**: You must rotate your credentials
+   - Change your database password
+   - Generate a new JWT secret
+3. **📋 See**: [SECURITY.md](SECURITY.md) for complete credential rotation guide
+
+For detailed security practices, see [SECURITY.md](SECURITY.md).
+
+---
