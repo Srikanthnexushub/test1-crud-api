@@ -53,6 +53,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        // Allow CORS preflight requests
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         // Authenticated endpoints
                         .anyRequest().authenticated()
                 )

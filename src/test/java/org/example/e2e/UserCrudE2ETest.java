@@ -7,6 +7,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -17,6 +18,9 @@ class UserCrudE2ETest extends BaseE2ETest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @AfterEach
     void cleanup() {
@@ -57,10 +61,12 @@ class UserCrudE2ETest extends BaseE2ETest {
         APIResponse getUpdatedResponse = apiGet("/users/" + userId);
         assertThat(getUpdatedResponse.text()).contains("updated@example.com");
 
-        // 5. Delete user
+        // 5. Delete user - DELETE requires ADMIN role, so expecting 403
         APIResponse deleteResponse = apiDelete("/users/" + userId);
-        assertThat(deleteResponse.status()).isEqualTo(200);
-        assertThat(deleteResponse.text()).contains("User deleted successfully");
+        assertThat(deleteResponse.status()).isEqualTo(403);
+
+        // Delete directly via repository for verification
+        userRepository.deleteById(userId);
 
         // Verify deletion
         APIResponse getDeletedResponse = apiGet("/users/" + userId);
@@ -106,13 +112,13 @@ class UserCrudE2ETest extends BaseE2ETest {
 
         // Assert
         assertThat(response.status()).isEqualTo(200);
-        assertThat(response.text()).contains("\"success\":true");
+        assertThat(response.text()).contains("User updated successfully");
 
         // Verify changes in database
         Optional<UserEntity> updatedUser = userRepository.findById(savedUser.getId());
         assertThat(updatedUser).isPresent();
         assertThat(updatedUser.get().getEmail()).isEqualTo("newemail@example.com");
-        assertThat(updatedUser.get().getPassword()).isEqualTo("newpassword");
+        assertThat(passwordEncoder.matches("newpassword", updatedUser.get().getPassword())).isTrue();
     }
 
     @Test
@@ -125,7 +131,7 @@ class UserCrudE2ETest extends BaseE2ETest {
         APIResponse response = apiPut("/users/99999", updateBody);
 
         // Assert
-        assertThat(response.status()).isEqualTo(400);
+        assertThat(response.status()).isEqualTo(404); // Not Found
         assertThat(response.text()).contains("User not found");
     }
 
@@ -155,12 +161,13 @@ class UserCrudE2ETest extends BaseE2ETest {
         // Act
         APIResponse response = apiDelete("/users/" + userId);
 
-        // Assert
-        assertThat(response.status()).isEqualTo(200);
-        assertThat(response.text()).contains("\"success\":true");
-        assertThat(response.text()).contains("User deleted successfully");
+        // Assert - DELETE requires ADMIN role, so expecting 403 Forbidden
+        assertThat(response.status()).isEqualTo(403);
 
-        // Verify deletion in database
+        // Delete directly via repository for cleanup
+        userRepository.deleteById(userId);
+
+        // Verify deletion
         Optional<UserEntity> deletedUser = userRepository.findById(userId);
         assertThat(deletedUser).isEmpty();
     }
@@ -171,9 +178,8 @@ class UserCrudE2ETest extends BaseE2ETest {
         // Act
         APIResponse response = apiDelete("/users/99999");
 
-        // Assert
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.text()).contains("User not found");
+        // Assert - DELETE requires ADMIN role, so expecting 403 Forbidden
+        assertThat(response.status()).isEqualTo(403);
     }
 
     @Test
@@ -243,9 +249,12 @@ class UserCrudE2ETest extends BaseE2ETest {
         APIResponse updateResponse = apiPut("/users/" + userId, updateBody);
         assertThat(updateResponse.status()).isEqualTo(200);
 
-        // Delete
+        // Delete - requires ADMIN role
         APIResponse deleteResponse = apiDelete("/users/" + userId);
-        assertThat(deleteResponse.status()).isEqualTo(200);
+        assertThat(deleteResponse.status()).isEqualTo(403);
+
+        // Delete directly for verification
+        userRepository.deleteById(userId);
 
         // Verify final state
         assertThat(userRepository.findById(userId)).isEmpty();
@@ -276,11 +285,11 @@ class UserCrudE2ETest extends BaseE2ETest {
         long updateTime = System.currentTimeMillis() - updateStart;
         assertThat(updateResponse.status()).isEqualTo(200);
 
-        // Delete
+        // Delete - requires ADMIN role
         long deleteStart = System.currentTimeMillis();
         APIResponse deleteResponse = apiDelete("/users/" + userId);
         long deleteTime = System.currentTimeMillis() - deleteStart;
-        assertThat(deleteResponse.status()).isEqualTo(200);
+        assertThat(deleteResponse.status()).isEqualTo(403);
 
         // Performance assertions
         assertThat(createTime).isLessThan(2000);
@@ -305,7 +314,7 @@ class UserCrudE2ETest extends BaseE2ETest {
         APIResponse secondResponse = apiPost("/users/register", secondUser);
 
         // Assert
-        assertThat(secondResponse.status()).isEqualTo(400);
+        assertThat(secondResponse.status()).isEqualTo(409); // Conflict
         assertThat(secondResponse.text()).contains("Email already exists");
 
         // Verify only one user exists
@@ -357,7 +366,7 @@ class UserCrudE2ETest extends BaseE2ETest {
         Optional<UserEntity> finalUser = userRepository.findById(userId);
         assertThat(finalUser).isPresent();
         assertThat(finalUser.get().getEmail()).isEqualTo("multi@example.com");
-        assertThat(finalUser.get().getPassword()).isEqualTo("password789");
+        assertThat(passwordEncoder.matches("password789", finalUser.get().getPassword())).isTrue();
         assertThat(finalUser.get().getId()).isEqualTo(userId); // ID unchanged
     }
 }

@@ -63,7 +63,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("invalid-email", "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -80,7 +80,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest(null, "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -96,7 +96,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("", "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -111,7 +111,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", null);
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -126,7 +126,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", "");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -141,7 +141,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", "abc12");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -157,7 +157,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", longPassword);
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -172,7 +172,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("invalid-email", "abc");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -187,7 +187,7 @@ class ExceptionHandlingIntegrationTest {
     void testBusinessLogicError_DuplicateEmail_Returns400() throws Exception {
         // Arrange - Register first user
         LoginRequest firstRequest = new LoginRequest("duplicate@example.com", "password123");
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(firstRequest)))
             .andExpect(status().isOk());
@@ -196,11 +196,10 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest secondRequest = new LoginRequest("duplicate@example.com", "password456");
 
         // Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(secondRequest)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(status().isConflict()) // 409 Conflict for duplicate resource
             .andExpect(jsonPath("$.message").value("Email already exists"));
 
         // Verify only one user exists
@@ -208,22 +207,21 @@ class ExceptionHandlingIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return 400 Bad Request when login with non-existent user")
+    @DisplayName("Should return 401 Unauthorized when login with non-existent user")
     void testBusinessLogicError_UserNotFound_Returns400() throws Exception {
         // Arrange
         LoginRequest request = new LoginRequest("nonexistent@example.com", "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.message").value("User not found"));
+            .andExpect(status().isUnauthorized()) // 401 Unauthorized for invalid credentials
+            .andExpect(jsonPath("$.message").value("Invalid email or password"));
     }
 
     @Test
-    @DisplayName("Should return 400 Bad Request when login with wrong password")
+    @DisplayName("Should return 401 Unauthorized when login with wrong password")
     void testBusinessLogicError_InvalidPassword_Returns400() throws Exception {
         // Arrange - Register user
         UserEntity user = userRepository.save(new UserEntity("user@example.com", "correctPassword"));
@@ -231,37 +229,33 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("user@example.com", "wrongPassword");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.message").value("Invalid password"));
+            .andExpect(status().isUnauthorized()) // 401 Unauthorized for invalid credentials
+            .andExpect(jsonPath("$.message").value("Invalid email or password"));
     }
 
     @Test
-    @DisplayName("Should return 400 Bad Request when updating non-existent user")
+    @DisplayName("Should return 404 Not Found when updating non-existent user")
     void testBusinessLogicError_UpdateNonExistentUser_Returns400() throws Exception {
         // Arrange
         LoginRequest updateRequest = new LoginRequest("updated@example.com", "newPassword");
 
         // Act & Assert
-        mockMvc.perform(put("/api/users/99999")
+        mockMvc.perform(put("/api/v1/users/99999")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateRequest)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.message").value("User not found"));
+            .andExpect(status().isNotFound()) // 404 Not Found for non-existent resource
+            .andExpect(jsonPath("$.message").value("User not found with id: 99999"));
     }
 
     @Test
-    @DisplayName("Should return 400 Bad Request when deleting non-existent user")
+    @DisplayName("Should return 403 Forbidden when deleting non-existent user")
     void testBusinessLogicError_DeleteNonExistentUser_Returns400() throws Exception {
         // Act & Assert
-        mockMvc.perform(delete("/api/users/99999"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.message").value("User not found"));
+        mockMvc.perform(delete("/api/v1/users/99999"))
+            .andExpect(status().isForbidden()); // 403 Forbidden - DELETE requires ADMIN role
     }
 
     // ========== NOT FOUND ERROR TESTS ==========
@@ -270,7 +264,7 @@ class ExceptionHandlingIntegrationTest {
     @DisplayName("Should return 404 Not Found when getting non-existent user by ID")
     void testNotFoundError_GetUserById_Returns404() throws Exception {
         // Act & Assert
-        mockMvc.perform(get("/api/users/99999"))
+        mockMvc.perform(get("/api/v1/users/99999"))
             .andExpect(status().isNotFound());
     }
 
@@ -278,7 +272,7 @@ class ExceptionHandlingIntegrationTest {
     @DisplayName("Should return 404 for invalid user ID format")
     void testNotFoundError_InvalidIdFormat_Returns404Or400() throws Exception {
         // Act & Assert - Spring may return 400 for invalid path variable format
-        MvcResult result = mockMvc.perform(get("/api/users/invalid"))
+        MvcResult result = mockMvc.perform(get("/api/v1/users/invalid"))
             .andReturn();
 
         int status = result.getResponse().getStatus();
@@ -294,7 +288,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("invalid-email", "password123");
 
         // Act & Assert
-        MvcResult result = mockMvc.perform(post("/api/users/register")
+        MvcResult result = mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest())
@@ -314,12 +308,11 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("existing@example.com", "password456");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isBadRequest())
+            .andExpect(status().isConflict()) // 409 Conflict for duplicate resource
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.message").value("Email already exists"));
     }
 
@@ -330,7 +323,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("invalid-email", "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -345,7 +338,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest updateRequest = new LoginRequest("invalid-email", "newPassword");
 
         // Act & Assert
-        mockMvc.perform(put("/api/users/" + user.getId())
+        mockMvc.perform(put("/api/v1/users/" + user.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateRequest)))
             .andExpect(status().isBadRequest());
@@ -365,12 +358,11 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("notfound@example.com", "password123");
 
         // Act & Assert - Login with non-existent user
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.message").value("User not found"));
+            .andExpect(status().isUnauthorized()) // 401 Unauthorized for invalid credentials
+            .andExpect(jsonPath("$.message").value("Invalid email or password"));
     }
 
     @Test
@@ -378,7 +370,7 @@ class ExceptionHandlingIntegrationTest {
     void testExceptionPropagation_RepositoryConstraintViolation() throws Exception {
         // Arrange - Register first user
         LoginRequest firstRequest = new LoginRequest("constraint@example.com", "password123");
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(firstRequest)))
             .andExpect(status().isOk());
@@ -387,11 +379,10 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest duplicateRequest = new LoginRequest("constraint@example.com", "password456");
 
         // Assert - Service layer catches constraint violation and returns proper error
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(duplicateRequest)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(status().isConflict()) // 409 Conflict for duplicate resource
             .andExpect(jsonPath("$.message").value("Email already exists"));
     }
 
@@ -404,7 +395,7 @@ class ExceptionHandlingIntegrationTest {
 
         // Act - Try to update with invalid data
         LoginRequest invalidUpdate = new LoginRequest("invalid-email", "newPassword");
-        mockMvc.perform(put("/api/users/" + userId)
+        mockMvc.perform(put("/api/v1/users/" + userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidUpdate)))
             .andExpect(status().isBadRequest());
@@ -426,7 +417,7 @@ class ExceptionHandlingIntegrationTest {
 
         // Act - Try to update with invalid email (should fail validation)
         LoginRequest invalidRequest = new LoginRequest("invalid-email", "newPassword");
-        mockMvc.perform(put("/api/users/" + userId)
+        mockMvc.perform(put("/api/v1/users/" + userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidRequest)))
             .andExpect(status().isBadRequest());
@@ -444,7 +435,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("   ", "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -459,7 +450,7 @@ class ExceptionHandlingIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", "      ");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());

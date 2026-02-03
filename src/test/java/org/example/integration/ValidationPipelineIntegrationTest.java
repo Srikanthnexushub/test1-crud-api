@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.example.config.TestSecurityConfig;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -41,6 +42,9 @@ class ValidationPipelineIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
@@ -60,7 +64,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("not-an-email", "password123");
 
         // Act & Assert - Should be caught at DTO validation layer
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -73,10 +77,10 @@ class ValidationPipelineIntegrationTest {
     @DisplayName("Should validate email format through complete pipeline - login endpoint")
     void testEmailValidation_LoginEndpoint_InvalidFormat() throws Exception {
         // Arrange
-        LoginRequest request = new LoginRequest("invalid@email", "password123");
+        LoginRequest request = new LoginRequest("invalid-email", "password123");
 
         // Act & Assert - Should be caught at DTO validation layer
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -87,7 +91,7 @@ class ValidationPipelineIntegrationTest {
     void testEmailValidation_UpdateEndpoint_InvalidFormat() throws Exception {
         // Arrange - Create valid user first
         LoginRequest validRequest = new LoginRequest("valid@example.com", "password123");
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest)))
             .andExpect(status().isOk());
@@ -98,7 +102,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest updateRequest = new LoginRequest("invalid-email", "newPassword");
 
         // Assert - Validation should prevent update
-        mockMvc.perform(put("/api/users/" + userId)
+        mockMvc.perform(put("/api/v1/users/" + userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateRequest)))
             .andExpect(status().isBadRequest());
@@ -125,7 +129,7 @@ class ValidationPipelineIntegrationTest {
             LoginRequest request = new LoginRequest(email, "password123");
 
             // Act & Assert
-            mockMvc.perform(post("/api/users/register")
+            mockMvc.perform(post("/api/v1/users/register")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -143,7 +147,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest(null, "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -158,7 +162,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("", "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -175,7 +179,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", "abc12");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -191,7 +195,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", longPassword);
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -206,15 +210,15 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", "pass12");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true));
 
-        // Verify user was created with exact password
-        assertThat(userRepository.findByEmail("test@example.com").orElseThrow().getPassword())
-            .isEqualTo("pass12");
+        // Verify user was created with BCrypt hashed password
+        String storedPassword = userRepository.findByEmail("test@example.com").orElseThrow().getPassword();
+        assertThat(passwordEncoder.matches("pass12", storedPassword)).isTrue();
     }
 
     @Test
@@ -225,15 +229,16 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", maxPassword);
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true));
 
-        // Verify password was stored correctly
-        assertThat(userRepository.findByEmail("test@example.com").orElseThrow().getPassword())
-            .hasSize(100);
+        // Verify password was stored correctly (BCrypt hash is 60 chars, not plain text)
+        String storedPassword = userRepository.findByEmail("test@example.com").orElseThrow().getPassword();
+        assertThat(storedPassword).hasSize(60); // BCrypt hash length
+        assertThat(passwordEncoder.matches(maxPassword, storedPassword)).isTrue();
     }
 
     @Test
@@ -243,7 +248,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", null);
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -258,7 +263,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("test@example.com", "");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -275,7 +280,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("invalid-email", "abc");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -290,7 +295,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest(null, null);
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -305,7 +310,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("", "");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest());
@@ -319,19 +324,19 @@ class ValidationPipelineIntegrationTest {
     @DisplayName("Should enforce validation consistently across register endpoint")
     void testValidationConsistency_RegisterEndpoint() throws Exception {
         // Test 1: Invalid email
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("bad-email", "password123"))))
             .andExpect(status().isBadRequest());
 
         // Test 2: Short password
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("test@example.com", "abc"))))
             .andExpect(status().isBadRequest());
 
         // Test 3: Valid request
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("valid@example.com", "password123"))))
             .andExpect(status().isOk());
@@ -343,23 +348,24 @@ class ValidationPipelineIntegrationTest {
     @Test
     @DisplayName("Should enforce validation consistently across login endpoint")
     void testValidationConsistency_LoginEndpoint() throws Exception {
-        // Register a valid user first
-        userRepository.save(new org.example.entity.UserEntity("login@example.com", "password123"));
+        // Register a valid user first - use PasswordEncoder to hash the password
+        org.example.entity.UserEntity user = new org.example.entity.UserEntity("login@example.com", passwordEncoder.encode("password123"));
+        userRepository.save(user);
 
         // Test 1: Invalid email format
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("bad-email", "password123"))))
             .andExpect(status().isBadRequest());
 
         // Test 2: Short password
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("login@example.com", "abc"))))
             .andExpect(status().isBadRequest());
 
         // Test 3: Valid request
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("login@example.com", "password123"))))
             .andExpect(status().isOk());
@@ -369,7 +375,7 @@ class ValidationPipelineIntegrationTest {
     @DisplayName("Should enforce validation consistently across update endpoint")
     void testValidationConsistency_UpdateEndpoint() throws Exception {
         // Register a user
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("user@example.com", "password123"))))
             .andExpect(status().isOk());
@@ -377,19 +383,19 @@ class ValidationPipelineIntegrationTest {
         Long userId = userRepository.findByEmail("user@example.com").orElseThrow().getId();
 
         // Test 1: Invalid email
-        mockMvc.perform(put("/api/users/" + userId)
+        mockMvc.perform(put("/api/v1/users/" + userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("bad-email", "newPassword"))))
             .andExpect(status().isBadRequest());
 
         // Test 2: Short password
-        mockMvc.perform(put("/api/users/" + userId)
+        mockMvc.perform(put("/api/v1/users/" + userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("updated@example.com", "abc"))))
             .andExpect(status().isBadRequest());
 
         // Test 3: Valid update
-        mockMvc.perform(put("/api/users/" + userId)
+        mockMvc.perform(put("/api/v1/users/" + userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("updated@example.com", "newPassword123"))))
             .andExpect(status().isOk());
@@ -409,15 +415,15 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("special@example.com", specialPassword);
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true));
 
-        // Verify special characters were stored correctly
-        assertThat(userRepository.findByEmail("special@example.com").orElseThrow().getPassword())
-            .isEqualTo(specialPassword);
+        // Verify special characters were stored correctly (BCrypt hashed)
+        String storedPassword = userRepository.findByEmail("special@example.com").orElseThrow().getPassword();
+        assertThat(passwordEncoder.matches(specialPassword, storedPassword)).isTrue();
     }
 
     @Test
@@ -427,7 +433,7 @@ class ValidationPipelineIntegrationTest {
         LoginRequest request = new LoginRequest("user+tag@example.com", "password123");
 
         // Act & Assert
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
@@ -441,13 +447,13 @@ class ValidationPipelineIntegrationTest {
     @DisplayName("Should reject whitespace-only fields at validation layer")
     void testValidation_WhitespaceFields_RejectedAtDTOLayer() throws Exception {
         // Test whitespace email
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("   ", "password123"))))
             .andExpect(status().isBadRequest());
 
         // Test whitespace password
-        mockMvc.perform(post("/api/users/register")
+        mockMvc.perform(post("/api/v1/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new LoginRequest("test@example.com", "      "))))
             .andExpect(status().isBadRequest());

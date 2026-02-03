@@ -2,8 +2,15 @@ package org.example.service;
 
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.entity.Role;
+import org.example.entity.RefreshToken;
 import org.example.entity.UserEntity;
+import org.example.exception.DuplicateResourceException;
+import org.example.exception.InvalidCredentialsException;
+import org.example.exception.ResourceNotFoundException;
+import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
+import org.example.security.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,12 +18,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -24,18 +34,58 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtUtil jwtUtil;
+
+    @Mock
+    private AuditLogService auditLogService;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     @InjectMocks
     private UserService userService;
 
     private UserEntity testUser;
     private LoginRequest loginRequest;
+    private Role defaultRole;
 
     @BeforeEach
     void setUp() {
-        testUser = new UserEntity("test@example.com", "password123");
+        testUser = new UserEntity("test@example.com", "hashed_password123");
         testUser.setId(1L);
 
         loginRequest = new LoginRequest("test@example.com", "password123");
+
+        // Setup default role
+        defaultRole = new Role(Role.RoleName.ROLE_USER, "Standard user");
+        lenient().when(roleRepository.findByName(Role.RoleName.ROLE_USER)).thenReturn(Optional.of(defaultRole));
+
+        // Setup password encoder
+        lenient().when(passwordEncoder.encode(anyString())).thenAnswer(invocation -> "hashed_" + invocation.getArgument(0));
+        lenient().when(passwordEncoder.matches(anyString(), anyString())).thenAnswer(invocation -> {
+            String raw = invocation.getArgument(0);
+            String encoded = invocation.getArgument(1);
+            return ("hashed_" + raw).equals(encoded) || raw.equals(encoded);
+        });
+
+        // Setup JWT util
+        lenient().when(jwtUtil.generateToken(anyString())).thenReturn("mock-jwt-token");
+
+        // Setup refresh token service
+        RefreshToken mockRefreshToken = new RefreshToken();
+        mockRefreshToken.setToken("mock-refresh-token");
+        lenient().when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
+
+        // Setup audit log service (no-op for tests)
+        lenient().doNothing().when(auditLogService).logSuccess(anyString(), anyString(), any(), anyString());
+        lenient().doNothing().when(auditLogService).logFailure(anyString(), anyString(), anyString());
     }
 
     // ==================== LOGIN TESTS ====================
@@ -58,10 +108,8 @@ class UserServiceTest {
         when(userRepository.findByEmail("wrong@example.com")).thenReturn(Optional.empty());
 
         LoginRequest request = new LoginRequest("wrong@example.com", "password123");
-        LoginResponse response = userService.login(request);
 
-        assertFalse(response.isSuccess());
-        assertEquals("User not found", response.getMessage());
+        assertThrows(InvalidCredentialsException.class, () -> userService.login(request));
     }
 
     @Test
@@ -70,10 +118,8 @@ class UserServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
         LoginRequest request = new LoginRequest("test@example.com", "wrongpassword");
-        LoginResponse response = userService.login(request);
 
-        assertFalse(response.isSuccess());
-        assertEquals("Invalid password", response.getMessage());
+        assertThrows(InvalidCredentialsException.class, () -> userService.login(request));
     }
 
     // ==================== REGISTER TESTS ====================
@@ -97,10 +143,7 @@ class UserServiceTest {
     void register_WithExistingEmail_ReturnsEmailExists() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
-        LoginResponse response = userService.register(loginRequest);
-
-        assertFalse(response.isSuccess());
-        assertEquals("Email already exists", response.getMessage());
+        assertThrows(DuplicateResourceException.class, () -> userService.register(loginRequest));
         verify(userRepository, never()).save(any(UserEntity.class));
     }
 
@@ -123,9 +166,7 @@ class UserServiceTest {
     void getUserById_WithInvalidId_ReturnsNull() {
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
-        UserEntity result = userService.getUserById(999L);
-
-        assertNull(result);
+        assertThrows(ResourceNotFoundException.class, () -> userService.getUserById(999L));
     }
 
     // ==================== UPDATE TESTS ====================
@@ -150,10 +191,8 @@ class UserServiceTest {
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
         LoginRequest request = new LoginRequest("updated@example.com", "newpassword");
-        LoginResponse response = userService.updateUser(999L, request);
 
-        assertFalse(response.isSuccess());
-        assertEquals("User not found", response.getMessage());
+        assertThrows(ResourceNotFoundException.class, () -> userService.updateUser(999L, request));
         verify(userRepository, never()).save(any(UserEntity.class));
     }
 
@@ -177,10 +216,7 @@ class UserServiceTest {
     void deleteUser_WithInvalidId_ReturnsUserNotFound() {
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
-        LoginResponse response = userService.deleteUser(999L);
-
-        assertFalse(response.isSuccess());
-        assertEquals("User not found", response.getMessage());
+        assertThrows(ResourceNotFoundException.class, () -> userService.deleteUser(999L));
         verify(userRepository, never()).deleteById(any());
     }
 
@@ -191,11 +227,17 @@ class UserServiceTest {
     void testRegisterWithNullEmail() {
         LoginRequest request = new LoginRequest(null, "password123");
         when(userRepository.findByEmail(null)).thenReturn(Optional.empty());
+        when(userRepository.save(any(UserEntity.class))).thenReturn(testUser);
 
+        // Mock refresh token for null email
+        RefreshToken mockRefreshToken = new RefreshToken();
+        mockRefreshToken.setToken("mock-refresh-token-null");
+        when(refreshTokenService.createRefreshToken(null)).thenReturn(mockRefreshToken);
+
+        // Service processes null email - validation should be at controller level
         LoginResponse response = userService.register(request);
 
-        // Service doesn't validate null - it passes to repository
-        // Validation should be done at controller level with @Valid
+        assertNotNull(response);
         verify(userRepository, times(1)).findByEmail(null);
     }
 
@@ -242,11 +284,8 @@ class UserServiceTest {
         LoginRequest request = new LoginRequest(null, null);
         when(userRepository.findByEmail(null)).thenReturn(Optional.empty());
 
-        LoginResponse response = userService.login(request);
-
-        // Service doesn't validate null - it tries to find by null email
-        assertFalse(response.isSuccess());
-        assertEquals("User not found", response.getMessage());
+        // Service throws exception for null email
+        assertThrows(InvalidCredentialsException.class, () -> userService.login(request));
         verify(userRepository, times(1)).findByEmail(null);
     }
 
@@ -315,10 +354,7 @@ class UserServiceTest {
         LoginRequest request = new LoginRequest(" test@example.com ", "password123");
         when(userRepository.findByEmail(" test@example.com ")).thenReturn(Optional.empty());
 
-        LoginResponse response = userService.login(request);
-
-        assertFalse(response.isSuccess());
-        assertEquals("User not found", response.getMessage());
+        assertThrows(InvalidCredentialsException.class, () -> userService.login(request));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package org.example.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
@@ -19,6 +20,7 @@ public class Role {
     @Column(length = 255)
     private String description;
 
+    @JsonIgnore
     @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
     private Set<UserEntity> users = new HashSet<>();
 

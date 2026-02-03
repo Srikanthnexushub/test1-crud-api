@@ -4,6 +4,9 @@ import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
 import org.example.entity.Role;
 import org.example.entity.UserEntity;
+import org.example.exception.DuplicateResourceException;
+import org.example.exception.InvalidCredentialsException;
+import org.example.exception.ResourceNotFoundException;
 import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
 import org.example.security.JwtUtil;
@@ -25,6 +28,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.example.util.TestDataBuilder.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -103,7 +107,7 @@ class UserServiceRepositoryIntegrationTest {
         Optional<UserEntity> savedUser = userRepository.findByEmail("newuser@example.com");
         assertThat(savedUser).isPresent();
         assertThat(savedUser.get().getEmail()).isEqualTo("newuser@example.com");
-        assertThat(savedUser.get().getPassword()).isEqualTo("password123");
+        assertThat(passwordEncoder.matches("password123", savedUser.get().getPassword())).isTrue();
         assertThat(savedUser.get().getId()).isNotNull();
     }
 
@@ -117,12 +121,8 @@ class UserServiceRepositoryIntegrationTest {
 
         LoginRequest request = createLoginRequest("duplicate@example.com", "password2");
 
-        // Act
-        LoginResponse response = userService.register(request);
-
-        // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("Email already exists");
+        // Act & Assert
+        assertThrows(DuplicateResourceException.class, () -> userService.register(request));
 
         // Verify only one user exists in database
         long count = userRepository.count();
@@ -174,8 +174,8 @@ class UserServiceRepositoryIntegrationTest {
     @Test
     @DisplayName("Should login successfully with valid credentials from database")
     void testLogin_ValidCredentials_SuccessWithDatabaseLookup() {
-        // Arrange
-        UserEntity user = createUserEntity("login@example.com", "password123");
+        // Arrange - Create user with BCrypt hashed password
+        UserEntity user = createUserEntity("login@example.com", passwordEncoder.encode("password123"));
         userRepository.save(user);
         entityManager.flush();
 
@@ -195,12 +195,8 @@ class UserServiceRepositoryIntegrationTest {
         // Arrange
         LoginRequest request = createLoginRequest("nonexistent@example.com", "password123");
 
-        // Act
-        LoginResponse response = userService.login(request);
-
-        // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("User not found");
+        // Act & Assert
+        assertThrows(InvalidCredentialsException.class, () -> userService.login(request));
     }
 
     @Test
@@ -213,19 +209,15 @@ class UserServiceRepositoryIntegrationTest {
 
         LoginRequest request = createLoginRequest("user@example.com", "wrongPassword");
 
-        // Act
-        LoginResponse response = userService.login(request);
-
-        // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("Invalid password");
+        // Act & Assert
+        assertThrows(InvalidCredentialsException.class, () -> userService.login(request));
     }
 
     @Test
     @DisplayName("Should handle case-sensitive email lookup in database")
     void testLogin_CaseSensitiveEmail_HandledCorrectly() {
-        // Arrange
-        UserEntity user = createUserEntity("Test@Example.com", "password123");
+        // Arrange - Create user with BCrypt hashed password
+        UserEntity user = createUserEntity("Test@Example.com", passwordEncoder.encode("password123"));
         userRepository.save(user);
         entityManager.flush();
 
@@ -259,13 +251,10 @@ class UserServiceRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return null when user ID not found in database")
+    @DisplayName("Should throw exception when user ID not found in database")
     void testGetUserById_UserNotFound_ReturnsNull() {
-        // Act
-        UserEntity retrievedUser = userService.getUserById(999L);
-
-        // Assert
-        assertThat(retrievedUser).isNull();
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> userService.getUserById(999L));
     }
 
     @Test
@@ -334,7 +323,7 @@ class UserServiceRepositoryIntegrationTest {
         // Verify new password persisted
         Optional<UserEntity> updatedUser = userRepository.findById(userId);
         assertThat(updatedUser).isPresent();
-        assertThat(updatedUser.get().getPassword()).isEqualTo("newPassword");
+        assertThat(passwordEncoder.matches("newPassword", updatedUser.get().getPassword())).isTrue();
 
         // Verify can login with new password
         LoginRequest loginRequest = createLoginRequest("user@example.com", "newPassword");
@@ -348,12 +337,8 @@ class UserServiceRepositoryIntegrationTest {
         // Arrange
         LoginRequest updateRequest = createLoginRequest("new@example.com", "newPassword");
 
-        // Act
-        LoginResponse response = userService.updateUser(999L, updateRequest);
-
-        // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("User not found");
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> userService.updateUser(999L, updateRequest));
     }
 
     @Test
@@ -405,12 +390,8 @@ class UserServiceRepositoryIntegrationTest {
     @Test
     @DisplayName("Should fail delete when user not found in database")
     void testDeleteUser_UserNotFound_FailsWithDatabaseCheck() {
-        // Act
-        LoginResponse response = userService.deleteUser(999L);
-
-        // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("User not found");
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> userService.deleteUser(999L));
     }
 
     @Test
@@ -486,8 +467,7 @@ class UserServiceRepositoryIntegrationTest {
 
         // Failed login with wrong password
         LoginRequest wrongLoginRequest = createLoginRequest("workflow@example.com", "wrongPassword");
-        LoginResponse failedLogin = userService.login(wrongLoginRequest);
-        assertThat(failedLogin.isSuccess()).isFalse();
+        assertThrows(InvalidCredentialsException.class, () -> userService.login(wrongLoginRequest));
 
         // Successful login with correct password
         LoginRequest correctLoginRequest = createLoginRequest("workflow@example.com", "correctPassword");
@@ -534,7 +514,9 @@ class UserServiceRepositoryIntegrationTest {
         // Verify persisted
         Optional<UserEntity> savedUser = userRepository.findByEmail("minpass@example.com");
         assertThat(savedUser).isPresent();
-        assertThat(savedUser.get().getPassword()).hasSize(6);
+        // Password should be BCrypt hashed (60 characters)
+        assertThat(savedUser.get().getPassword()).hasSize(60);
+        assertThat(passwordEncoder.matches("pass12", savedUser.get().getPassword())).isTrue();
     }
 
     @Test

@@ -47,9 +47,8 @@ class LoginE2ETest extends BaseE2ETest {
         APIResponse response = apiPost("/users/login", loginBody);
 
         // Assert
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.text()).contains("\"success\":false");
-        assertThat(response.text()).contains("User not found");
+        assertThat(response.status()).isEqualTo(401); // Unauthorized
+        assertThat(response.text()).contains("Invalid email or password");
     }
 
     @Test
@@ -64,9 +63,8 @@ class LoginE2ETest extends BaseE2ETest {
         APIResponse response = apiPost("/users/login", loginBody);
 
         // Assert
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.text()).contains("\"success\":false");
-        assertThat(response.text()).contains("Invalid password");
+        assertThat(response.status()).isEqualTo(401); // Unauthorized
+        assertThat(response.text()).contains("Invalid email or password");
     }
 
     @Test
@@ -162,8 +160,8 @@ class LoginE2ETest extends BaseE2ETest {
         APIResponse response = apiPost("/users/login", loginBody);
 
         // Assert
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.text()).contains("Invalid password");
+        assertThat(response.status()).isEqualTo(401); // Unauthorized
+        assertThat(response.text()).contains("Invalid email or password");
     }
 
     @Test
@@ -255,16 +253,16 @@ class LoginE2ETest extends BaseE2ETest {
         // Get user ID from database
         Long userId = userRepository.findByEmail("delete@example.com").get().getId();
 
-        // Delete user
-        apiDelete("/users/" + userId);
+        // Delete user directly from repository (DELETE endpoint requires ADMIN role)
+        userRepository.deleteById(userId);
 
         // Act - Try to login
         String loginBody = "{\"email\":\"delete@example.com\",\"password\":\"password123\"}";
         APIResponse response = apiPost("/users/login", loginBody);
 
         // Assert
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.text()).contains("User not found");
+        assertThat(response.status()).isEqualTo(401); // Unauthorized
+        assertThat(response.text()).contains("Invalid email or password");
     }
 
     @Test

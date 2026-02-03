@@ -50,8 +50,7 @@ class RegistrationE2ETest extends BaseE2ETest {
         APIResponse response = apiPost("/users/register", requestBody);
 
         // Assert
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.text()).contains("\"success\":false");
+        assertThat(response.status()).isEqualTo(409); // Conflict status for duplicate resource
         assertThat(response.text()).contains("Email already exists");
     }
 

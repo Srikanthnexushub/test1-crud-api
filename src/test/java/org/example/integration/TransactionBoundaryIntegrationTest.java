@@ -26,9 +26,13 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import org.example.exception.DuplicateResourceException;
+import org.example.exception.ResourceNotFoundException;
 
 /**
  * Integration tests for transaction boundary and rollback scenarios.
@@ -177,13 +181,9 @@ class TransactionBoundaryIntegrationTest {
         userService.register(request1);
         entityManager.flush();
 
-        // Act - Try to register duplicate
+        // Act & Assert - Try to register duplicate should throw exception
         LoginRequest request2 = new LoginRequest("service@example.com", "password2");
-        LoginResponse response = userService.register(request2);
-
-        // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("Email already exists");
+        assertThrows(DuplicateResourceException.class, () -> userService.register(request2));
 
         // Verify only one user exists
         assertThat(userRepository.count()).isEqualTo(1);
@@ -197,12 +197,9 @@ class TransactionBoundaryIntegrationTest {
         entityManager.flush();
         Long userId = user.getId();
 
-        // Act - Try to update to non-existent user (should fail)
+        // Act & Assert - Try to update non-existent user should throw exception
         LoginRequest updateRequest = new LoginRequest("updated@example.com", "newPassword");
-        LoginResponse response = userService.updateUser(999L, updateRequest);
-
-        // Assert - Update failed
-        assertThat(response.isSuccess()).isFalse();
+        assertThrows(ResourceNotFoundException.class, () -> userService.updateUser(999L, updateRequest));
 
         // Verify original user data is unchanged
         entityManager.clear();
@@ -433,10 +430,7 @@ class TransactionBoundaryIntegrationTest {
     @Test
     @DisplayName("Should handle non-existent ID gracefully in service operations")
     void testNonExistentIdHandling_InServiceOperations() {
-        // Act
-        UserEntity result = userService.getUserById(99999L);
-
-        // Assert - Should return null for non-existent ID
-        assertThat(result).isNull();
+        // Act & Assert - Should throw ResourceNotFoundException for non-existent ID
+        assertThrows(ResourceNotFoundException.class, () -> userService.getUserById(99999L));
     }
 }

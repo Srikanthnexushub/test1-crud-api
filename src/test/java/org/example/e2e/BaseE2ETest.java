@@ -61,8 +61,8 @@ public abstract class BaseE2ETest {
      * Helper method to make API POST requests
      */
     protected APIResponse apiPost(String endpoint, String jsonBody) {
-        // Prepend /api if not already present
-        String fullPath = endpoint.startsWith("/api") ? endpoint : "/api" + endpoint;
+        // Prepend /api/v1 if not already present
+        String fullPath = endpoint.startsWith("/api") ? endpoint : "/api/v1" + endpoint;
         return apiContext.post(fullPath,
             com.microsoft.playwright.options.RequestOptions.create()
                 .setHeader("Content-Type", "application/json")
@@ -73,7 +73,7 @@ public abstract class BaseE2ETest {
      * Helper method to make API GET requests
      */
     protected APIResponse apiGet(String endpoint) {
-        String fullPath = endpoint.startsWith("/api") ? endpoint : "/api" + endpoint;
+        String fullPath = endpoint.startsWith("/api") ? endpoint : "/api/v1" + endpoint;
         return apiContext.get(fullPath);
     }
 
@@ -81,7 +81,7 @@ public abstract class BaseE2ETest {
      * Helper method to make API PUT requests
      */
     protected APIResponse apiPut(String endpoint, String jsonBody) {
-        String fullPath = endpoint.startsWith("/api") ? endpoint : "/api" + endpoint;
+        String fullPath = endpoint.startsWith("/api") ? endpoint : "/api/v1" + endpoint;
         return apiContext.put(fullPath,
             com.microsoft.playwright.options.RequestOptions.create()
                 .setHeader("Content-Type", "application/json")
@@ -92,7 +92,7 @@ public abstract class BaseE2ETest {
      * Helper method to make API DELETE requests
      */
     protected APIResponse apiDelete(String endpoint) {
-        String fullPath = endpoint.startsWith("/api") ? endpoint : "/api" + endpoint;
+        String fullPath = endpoint.startsWith("/api") ? endpoint : "/api/v1" + endpoint;
         return apiContext.delete(fullPath);
     }
 
