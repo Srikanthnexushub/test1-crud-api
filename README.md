@@ -15,6 +15,8 @@ A production-ready, Fortune 100 enterprise-grade RESTful CRUD API built with Spr
 - **CRUD Operations** for user management
 - **PostgreSQL** database with JPA/Hibernate
 - **React Frontend** with enterprise-grade UI components
+- **Admin Dashboard** with complete user management interface
+- **Password Visibility Toggle** on all authentication forms for improved UX
 
 ### Security & Authentication
 - ✅ **JWT Authentication** with refresh token pattern
@@ -57,13 +59,49 @@ A production-ready, Fortune 100 enterprise-grade RESTful CRUD API built with Spr
 
 ## 🛠️ Quick Start
 
-### Option 1: Using Docker (Recommended)
+### ⚡ One-Command Startup (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/Srikanthnexushub/test1-crud-api.git
 cd test1-crud-api
 
+# Start all services with one command
+./start-services.sh
+```
+
+This will automatically:
+- ✅ Verify PostgreSQL connection
+- ✅ Stop any existing services
+- ✅ Start Spring Boot backend
+- ✅ Start React frontend
+- ✅ Display access URLs and credentials
+
+**Service URLs:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8080
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- Health Check: http://localhost:8080/actuator/health
+
+**Admin Credentials:**
+- Email: `admin@example.com`
+- Password: `Admin@123456`
+
+**Stop Services:**
+```bash
+./stop-services.sh
+```
+
+**Check Status:**
+```bash
+./status-services.sh
+```
+
+For detailed startup instructions, see [STARTUP_GUIDE.md](STARTUP_GUIDE.md).
+
+### Option 1: Using Docker
+
+```bash
 # Start all services with Docker Compose
 docker-compose up -d
 
@@ -72,26 +110,25 @@ docker-compose up -d
 # PostgreSQL available at localhost:5432
 ```
 
-### Option 2: Local Development
+### Option 2: Manual Local Development
 
 ```bash
 # 1. Setup PostgreSQL database
-createdb crud_operation
+createdb Crud_db
 
-# 2. Configure database connection
-# Edit src/main/resources/application.properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/crud_operation
-spring.datasource.username=your_username
-spring.datasource.password=your_password
+# 2. Configure environment variables
+cp .env.example .env
+# Edit .env with your credentials
 
 # 3. Build and run the backend
-mvn clean install
-mvn spring-boot:run
+mvn clean package -Dmaven.test.skip=true
+export $(cat .env | grep -v '^#' | xargs)
+java -jar target/Crud_Operation-1.0-SNAPSHOT.jar
 
 # 4. Run the frontend (in another terminal)
 cd frontend
 npm install
-npm start
+npm run dev
 ```
 
 ## 🧪 Running Tests
@@ -170,10 +207,29 @@ Content-Type: application/json
 
 ### User Management Endpoints
 
+#### Get All Users (Admin Only)
+```http
+GET /api/v1/users
+Authorization: Bearer {token}
+```
+
 #### Get User by ID
 ```http
 GET /api/v1/users/{id}
 Authorization: Bearer {token}
+```
+
+#### Create User (Admin Only)
+```http
+POST /api/v1/users
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "password123",
+  "role": "ROLE_USER"
+}
 ```
 
 #### Update User
@@ -184,8 +240,11 @@ Content-Type: application/json
 
 {
   "email": "newemail@example.com",
-  "password": "newPassword123"
+  "password": "newPassword123",
+  "role": "ROLE_MANAGER"
 }
+
+Note: Password is optional. Omit to keep current password.
 ```
 
 #### Delete User (Admin Only)
@@ -225,6 +284,19 @@ test1-crud-api/
 │           ├── integration/    # Integration tests
 │           └── e2e/            # End-to-end tests
 ├── frontend/                   # React application
+│   ├── src/
+│   │   ├── components/         # React components
+│   │   │   ├── Login.jsx       # Login with password toggle
+│   │   │   ├── Register.jsx    # Registration with password toggle
+│   │   │   ├── Dashboard.jsx   # Admin dashboard
+│   │   │   └── UserManagement.jsx  # User CRUD interface
+│   │   ├── services/           # API services
+│   │   └── context/            # React context
+│   └── package.json
+├── start-services.sh           # One-command startup script
+├── stop-services.sh            # Stop all services
+├── status-services.sh          # Check service status
+├── STARTUP_GUIDE.md            # Quick startup reference
 ├── docker-compose.yml
 ├── Dockerfile
 └── pom.xml
@@ -243,10 +315,12 @@ test1-crud-api/
 - Hibernate Validator
 
 **Frontend:**
-- React 18
+- React 18.2.0
+- Vite 5.0.8
 - Axios
 - React Router
-- Modern CSS
+- Lucide React (icons)
+- Modern CSS with CSS Variables
 
 **Testing:**
 - JUnit 5
@@ -365,6 +439,24 @@ JWT_SECRET=your-secret-key-here-at-least-32-characters-long
 - Supports 10+ concurrent requests
 - Thread-safe service layer
 - Connection pooling enabled
+
+## 🎨 User Interface Features
+
+### Authentication Pages
+- ✅ **Login Page** with password visibility toggle
+- ✅ **Registration Page** with password strength indicator
+- ✅ **Password Visibility Toggle** on all password fields (eye icon)
+- ✅ **Form Validation** with real-time error messages
+- ✅ **Responsive Design** for mobile and desktop
+
+### Admin Dashboard
+- ✅ **User Management Interface** with full CRUD operations
+- ✅ **Role-Based Access Control** UI (USER, MANAGER, ADMIN)
+- ✅ **Real-time Status Badges** (Active/Locked accounts)
+- ✅ **Create User Modal** with role selection
+- ✅ **Edit User Modal** with optional password update
+- ✅ **Delete Confirmation** dialogs
+- ✅ **Password Visibility Toggle** in all forms
 
 ## 🧩 Code Quality
 
