@@ -66,3 +66,5 @@ frontend/package-lock.json
 *.temp
 *.swp
 *~
+# Archive folders
+archive_*/
