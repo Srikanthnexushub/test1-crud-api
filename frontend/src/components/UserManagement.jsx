@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { userAPI, authAPI } from '../services/api';
-import { Users, Edit, Trash2, Plus, X, Save, AlertCircle, CheckCircle, Shield, User as UserIcon } from 'lucide-react';
+import { Users, Edit, Trash2, Plus, X, Save, AlertCircle, CheckCircle, Shield, User as UserIcon, Eye, EyeOff } from 'lucide-react';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -13,6 +13,8 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [formData, setFormData] = useState({ email: '', password: '', role: 'ROLE_USER' });
   const [formErrors, setFormErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -111,6 +113,7 @@ const UserManagement = () => {
     const userRole = user.roles && user.roles.length > 0 ? user.roles[0].name : 'ROLE_USER';
     setFormData({ email: user.email, password: '', role: userRole });
     setFormErrors({});
+    setShowEditPassword(false);
     setShowEditModal(true);
   };
 
@@ -122,6 +125,7 @@ const UserManagement = () => {
   const openCreateModal = () => {
     setFormData({ email: '', password: '', role: 'ROLE_USER' });
     setFormErrors({});
+    setShowPassword(false);
     setShowCreateModal(true);
   };
 
@@ -132,6 +136,8 @@ const UserManagement = () => {
     setSelectedUser(null);
     setFormData({ email: '', password: '', role: 'ROLE_USER' });
     setFormErrors({});
+    setShowPassword(false);
+    setShowEditPassword(false);
   };
 
   const getRoleBadge = (roles) => {
@@ -299,13 +305,23 @@ const UserManagement = () => {
               </div>
               <div className="form-group">
                 <label>Password</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className={formErrors.password ? 'error' : ''}
-                  placeholder="••••••••"
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className={formErrors.password ? 'error' : ''}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 {formErrors.password && <span className="error-text">{formErrors.password}</span>}
               </div>
               <div className="form-group">
@@ -358,13 +374,23 @@ const UserManagement = () => {
               </div>
               <div className="form-group">
                 <label>New Password (leave blank to keep current)</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className={formErrors.password ? 'error' : ''}
-                  placeholder="••••••••"
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showEditPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className={formErrors.password ? 'error' : ''}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    aria-label={showEditPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showEditPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 {formErrors.password && <span className="error-text">{formErrors.password}</span>}
               </div>
               <div className="form-group">
