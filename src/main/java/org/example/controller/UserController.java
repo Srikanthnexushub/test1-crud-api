@@ -12,21 +12,31 @@ import jakarta.validation.Valid;
 import org.example.dto.ErrorResponse;
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.dto.RefreshTokenRequest;
+import org.example.entity.RefreshToken;
 import org.example.entity.UserEntity;
+import org.example.exception.InvalidCredentialsException;
+import org.example.security.JwtUtil;
+import org.example.service.RefreshTokenService;
 import org.example.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/v1/users")
 @Tag(name = "User Management", description = "APIs for user registration, authentication, and CRUD operations")
 public class UserController {
 
     private final UserService userService;
+    private final RefreshTokenService refreshTokenService;
+    private final JwtUtil jwtUtil;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, RefreshTokenService refreshTokenService, JwtUtil jwtUtil) {
         this.userService = userService;
+        this.refreshTokenService = refreshTokenService;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/register")
@@ -61,6 +71,29 @@ public class UserController {
             @Valid @RequestBody LoginRequest request) {
         LoginResponse response = userService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh access token", description = "Generates a new access token using a valid refresh token")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Token refreshed successfully",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid input",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<LoginResponse> refreshToken(
+            @Parameter(description = "Refresh token request", required = true)
+            @Valid @RequestBody RefreshTokenRequest request) {
+        return refreshTokenService.findByToken(request.getRefreshToken())
+                .map(refreshTokenService::verifyExpiration)
+                .map(RefreshToken::getUser)
+                .map(user -> {
+                    String newAccessToken = jwtUtil.generateToken(user.getEmail());
+                    return ResponseEntity.ok(new LoginResponse(true, "Token refreshed successfully", newAccessToken));
+                })
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid refresh token"));
     }
 
     @GetMapping("/{id}")
@@ -107,11 +140,14 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Delete user", description = "Deletes a user account (requires authentication)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete user", description = "Deletes a user account (requires ADMIN role)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "User deleted successfully",
                     content = @Content(schema = @Schema(implementation = LoginResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden - Admin role required",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "User not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))

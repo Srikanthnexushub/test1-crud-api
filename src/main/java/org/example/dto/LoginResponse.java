@@ -8,6 +8,7 @@ public class LoginResponse {
     private boolean success;
     private String message;
     private String token;
+    private String refreshToken;
 
     public LoginResponse() {
     }
@@ -21,6 +22,13 @@ public class LoginResponse {
         this.success = success;
         this.message = message;
         this.token = token;
+    }
+
+    public LoginResponse(boolean success, String message, String token, String refreshToken) {
+        this.success = success;
+        this.message = message;
+        this.token = token;
+        this.refreshToken = refreshToken;
     }
 
     public boolean isSuccess() {
@@ -45,5 +53,13 @@ public class LoginResponse {
 
     public void setToken(String token) {
         this.token = token;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
     }
 }
