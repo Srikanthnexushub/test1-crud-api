@@ -96,13 +96,28 @@ export const authAPI = {
 };
 
 export const userAPI = {
+  getAllUsers: async () => {
+    const response = await api.get('/users');
+    return response.data;
+  },
+
   getUser: async (id) => {
     const response = await api.get(`/users/${id}`);
     return response.data;
   },
 
-  updateUser: async (id, email, password) => {
-    const response = await api.put(`/users/${id}`, { email, password });
+  createUser: async (email, password, role) => {
+    const payload = { email, password };
+    if (role) payload.role = role;
+    const response = await api.post('/users', payload);
+    return response.data;
+  },
+
+  updateUser: async (id, email, password, role) => {
+    const payload = { email };
+    if (password && password.trim()) payload.password = password;
+    if (role) payload.role = role;
+    const response = await api.put(`/users/${id}`, payload);
     return response.data;
   },
 

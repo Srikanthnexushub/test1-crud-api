@@ -1,5 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import UserManagement from './UserManagement';
 import {
   LogOut,
   User,
@@ -141,6 +142,9 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Admin-only User Management */}
+        {hasRole('ROLE_ADMIN') && <UserManagement />}
       </div>
     </div>
   );

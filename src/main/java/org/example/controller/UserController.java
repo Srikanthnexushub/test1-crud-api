@@ -9,10 +9,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.example.dto.*;
 import org.example.dto.ErrorResponse;
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
 import org.example.dto.RefreshTokenRequest;
+import org.example.dto.UserCreateRequest;
+import org.example.dto.UserUpdateRequest;
 import org.example.entity.RefreshToken;
 import org.example.entity.UserEntity;
 import org.example.exception.InvalidCredentialsException;
@@ -96,6 +99,39 @@ public class UserController {
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid refresh token"));
     }
 
+    @GetMapping
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get all users", description = "Retrieves list of all users (requires ADMIN role)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Users retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden - Admin role required",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<?> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers());
+    }
+
+    @PostMapping
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Create user (Admin)", description = "Creates a new user with specified role (requires ADMIN role)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User created successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid input",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden - Admin role required",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Email already exists",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<LoginResponse> createUser(@Valid @RequestBody UserCreateRequest request) {
+        LoginResponse response = userService.createUser(request);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Get user by ID", description = "Retrieves user details by their ID (requires authentication)")
@@ -133,7 +169,7 @@ public class UserController {
             @Parameter(description = "User ID", required = true, example = "1")
             @PathVariable Long id,
             @Parameter(description = "Updated user details", required = true)
-            @Valid @RequestBody LoginRequest request) {
+            @Valid @RequestBody UserUpdateRequest request) {
         LoginResponse response = userService.updateUser(id, request);
         return ResponseEntity.ok(response);
     }
