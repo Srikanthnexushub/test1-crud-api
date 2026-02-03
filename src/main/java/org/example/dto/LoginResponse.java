@@ -1,9 +1,13 @@
 package org.example.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class LoginResponse {
 
     private boolean success;
     private String message;
+    private String token;
 
     public LoginResponse() {
     }
@@ -11,6 +15,12 @@ public class LoginResponse {
     public LoginResponse(boolean success, String message) {
         this.success = success;
         this.message = message;
+    }
+
+    public LoginResponse(boolean success, String message, String token) {
+        this.success = success;
+        this.message = message;
+        this.token = token;
     }
 
     public boolean isSuccess() {
@@ -27,5 +37,13 @@ public class LoginResponse {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 }
