@@ -89,7 +89,7 @@ public class UserController {
     public ResponseEntity<LoginResponse> refreshToken(
             @Parameter(description = "Refresh token request", required = true)
             @Valid @RequestBody RefreshTokenRequest request) {
-        return refreshTokenService.findByToken(request.getRefreshToken())
+        return refreshTokenService.findByToken(request.refreshToken())
                 .map(refreshTokenService::verifyExpiration)
                 .map(RefreshToken::getUser)
                 .map(user -> {

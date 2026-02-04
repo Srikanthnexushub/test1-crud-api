@@ -1,26 +1,28 @@
 package org.example.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+/**
+ * Immutable error response DTO using Java Record.
+ * Replaces Lombok @Data with Record for true immutability.
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ErrorResponse {
-    private LocalDateTime timestamp;
-    private int status;
-    private String error;
-    private String message;
-    private String path;
-    private Map<String, String> validationErrors;
-    private String traceId;
+public record ErrorResponse(
+    LocalDateTime timestamp,
+    int status,
+    String error,
+    String message,
+    String path,
+    Map<String, String> validationErrors,
+    String traceId
+) {
+    // Defensive copy for mutable Map parameter
+    public ErrorResponse {
+        validationErrors = validationErrors != null
+            ? Map.copyOf(validationErrors)
+            : null;
+    }
 }

@@ -1,5 +1,6 @@
 package org.example.integration;
 
+import org.example.config.properties.SecurityProperties;
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
 import org.example.dto.UserUpdateRequest;
@@ -59,6 +60,7 @@ class TransactionBoundaryIntegrationTest {
     private JwtUtil jwtUtil;
     private AuditLogService auditLogService;
     private RefreshTokenService refreshTokenService;
+    private SecurityProperties securityProperties;
 
     @BeforeEach
     void setUp() {
@@ -72,6 +74,7 @@ class TransactionBoundaryIntegrationTest {
         jwtUtil = mock(JwtUtil.class);
         auditLogService = mock(AuditLogService.class);
         refreshTokenService = mock(RefreshTokenService.class);
+        securityProperties = mock(SecurityProperties.class);
 
         // Mock default role for registration
         Role defaultRole = new Role(Role.RoleName.ROLE_USER, "Standard user");
@@ -79,15 +82,20 @@ class TransactionBoundaryIntegrationTest {
 
         // Mock JWT token generation
         when(jwtUtil.generateToken(anyString())).thenReturn("mock-jwt-token");
+        when(jwtUtil.generateToken(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn("mock-jwt-token");
 
         // Mock refresh token service
         org.example.entity.RefreshToken mockRefreshToken = new org.example.entity.RefreshToken();
         mockRefreshToken.setToken("mock-refresh-token");
         when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
 
+        // Mock security properties
+        when(securityProperties.getMaxFailedAttempts()).thenReturn(5);
+        when(securityProperties.getLockTimeDuration()).thenReturn(900000L); // 15 minutes
+
         // Manually instantiate UserService with all dependencies
         userService = new UserService(userRepository, roleRepository, passwordEncoder,
-                                     jwtUtil, auditLogService, refreshTokenService);
+                                     jwtUtil, auditLogService, refreshTokenService, securityProperties);
     }
 
     // ========== CONSTRAINT VIOLATION TESTS ==========
@@ -224,7 +232,7 @@ class TransactionBoundaryIntegrationTest {
         LoginResponse response = userService.updateUser(userId, updateRequest);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.success()).isTrue();
 
         // Force flush to ensure transaction commits
         entityManager.flush();
@@ -298,7 +306,7 @@ class TransactionBoundaryIntegrationTest {
         entityManager.clear();
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.success()).isTrue();
         assertThat(userRepository.findById(userId)).isEmpty();
     }
 
@@ -339,22 +347,22 @@ class TransactionBoundaryIntegrationTest {
         // Act - Multiple sequential operations
         // 1. Login
         LoginResponse loginResponse = userService.login(registerRequest);
-        assertThat(loginResponse.isSuccess()).isTrue();
+        assertThat(loginResponse.success()).isTrue();
 
         // 2. Update
         UserUpdateRequest updateRequest = new UserUpdateRequest("updated@example.com", "password2", null);
         LoginResponse updateResponse = userService.updateUser(userId, updateRequest);
-        assertThat(updateResponse.isSuccess()).isTrue();
+        assertThat(updateResponse.success()).isTrue();
         entityManager.flush();
 
         // 3. Login with new credentials
         LoginRequest newLoginRequest = new LoginRequest("updated@example.com", "password2");
         LoginResponse newLoginResponse = userService.login(newLoginRequest);
-        assertThat(newLoginResponse.isSuccess()).isTrue();
+        assertThat(newLoginResponse.success()).isTrue();
 
         // 4. Delete
         LoginResponse deleteResponse = userService.deleteUser(userId);
-        assertThat(deleteResponse.isSuccess()).isTrue();
+        assertThat(deleteResponse.success()).isTrue();
         entityManager.flush();
 
         // Assert - User should be gone

@@ -86,7 +86,7 @@ class ConcurrentOperationsIntegrationTest {
                     startLatch.await(); // Wait for start signal
                     LoginRequest request = new LoginRequest("user" + index + "@example.com", "password" + index);
                     LoginResponse response = userService.register(request);
-                    if (response.isSuccess()) {
+                    if (response.success()) {
                         successCount.incrementAndGet();
                     }
                 } catch (Exception e) {
@@ -123,7 +123,7 @@ class ConcurrentOperationsIntegrationTest {
                     startLatch.await();
                     LoginRequest request = new LoginRequest(duplicateEmail, "password123");
                     LoginResponse response = userService.register(request);
-                    if (response.isSuccess()) {
+                    if (response.success()) {
                         successCount.incrementAndGet();
                     } else {
                         failureCount.incrementAndGet();
@@ -158,7 +158,7 @@ class ConcurrentOperationsIntegrationTest {
             Future<Boolean> future = executorService.submit(() -> {
                 LoginRequest request = new LoginRequest("concurrent" + index + "@example.com", "pass" + index);
                 LoginResponse response = userService.register(request);
-                return response.isSuccess();
+                return response.success();
             });
             futures.add(future);
         }
@@ -244,7 +244,7 @@ class ConcurrentOperationsIntegrationTest {
                     startLatch.await();
                     UserUpdateRequest updateRequest = new UserUpdateRequest("updated" + index + "@example.com", "newPass" + index, null);
                     LoginResponse response = userService.updateUser(userIds.get(index), updateRequest);
-                    if (response.isSuccess()) {
+                    if (response.success()) {
                         successCount.incrementAndGet();
                     }
                 } catch (Exception e) {
@@ -293,7 +293,7 @@ class ConcurrentOperationsIntegrationTest {
                 try {
                     startLatch.await();
                     LoginResponse response = userService.deleteUser(userIds.get(index));
-                    if (response.isSuccess()) {
+                    if (response.success()) {
                         successCount.incrementAndGet();
                     }
                 } catch (Exception e) {
@@ -331,7 +331,7 @@ class ConcurrentOperationsIntegrationTest {
                 try {
                     startLatch.await();
                     LoginResponse response = userService.deleteUser(userId);
-                    if (response.isSuccess()) {
+                    if (response.success()) {
                         successCount.incrementAndGet();
                     } else {
                         failureCount.incrementAndGet();
@@ -378,7 +378,7 @@ class ConcurrentOperationsIntegrationTest {
                     startLatch.await();
                     LoginRequest request = new LoginRequest(testEmail, "password123");
                     LoginResponse response = userService.login(request);
-                    if (response.isSuccess()) {
+                    if (response.success()) {
                         successCount.incrementAndGet();
                     }
                 } catch (Exception e) {
@@ -420,7 +420,7 @@ class ConcurrentOperationsIntegrationTest {
                     startLatch.await();
                     LoginRequest request = new LoginRequest("mixed" + index + "@example.com", "pass" + index);
                     LoginResponse response = userService.register(request);
-                    if (response.isSuccess()) {
+                    if (response.success()) {
                         operationSuccess.incrementAndGet();
                     }
                 } catch (Exception e) {
@@ -439,7 +439,7 @@ class ConcurrentOperationsIntegrationTest {
                     startLatch.await();
                     LoginRequest request = new LoginRequest("mixed" + index + "@example.com", "pass" + index);
                     LoginResponse response = userService.login(request);
-                    if (response.isSuccess()) {
+                    if (response.success()) {
                         operationSuccess.incrementAndGet();
                     }
                 } catch (Exception e) {

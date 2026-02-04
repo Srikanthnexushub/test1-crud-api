@@ -1,5 +1,6 @@
 package org.example.integration;
 
+import org.example.config.properties.SecurityProperties;
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
 import org.example.dto.UserUpdateRequest;
@@ -59,6 +60,7 @@ class UserServiceRepositoryIntegrationTest {
     private JwtUtil jwtUtil;
     private AuditLogService auditLogService;
     private RefreshTokenService refreshTokenService;
+    private SecurityProperties securityProperties;
 
     @BeforeEach
     void setUp() {
@@ -71,6 +73,7 @@ class UserServiceRepositoryIntegrationTest {
         jwtUtil = mock(JwtUtil.class);
         auditLogService = mock(AuditLogService.class);
         refreshTokenService = mock(RefreshTokenService.class);
+        securityProperties = mock(SecurityProperties.class);
 
         // Mock default role for registration
         Role defaultRole = new Role(Role.RoleName.ROLE_USER, "Standard user");
@@ -78,15 +81,20 @@ class UserServiceRepositoryIntegrationTest {
 
         // Mock JWT token generation
         when(jwtUtil.generateToken(anyString())).thenReturn("mock-jwt-token");
+        when(jwtUtil.generateToken(anyString(), any())).thenReturn("mock-jwt-token");
 
         // Mock refresh token service
         org.example.entity.RefreshToken mockRefreshToken = new org.example.entity.RefreshToken();
         mockRefreshToken.setToken("mock-refresh-token");
         when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
 
+        // Mock security properties
+        when(securityProperties.getMaxFailedAttempts()).thenReturn(5);
+        when(securityProperties.getLockTimeDuration()).thenReturn(900000L); // 15 minutes
+
         // Manually instantiate UserService with all dependencies
         userService = new UserService(userRepository, roleRepository, passwordEncoder,
-                                     jwtUtil, auditLogService, refreshTokenService);
+                                     jwtUtil, auditLogService, refreshTokenService, securityProperties);
     }
 
     // ========== REGISTRATION TESTS ==========
@@ -101,8 +109,8 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response = userService.register(request);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isEqualTo("Registration successful");
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("Registration successful");
 
         // Verify persistence in database
         Optional<UserEntity> savedUser = userRepository.findByEmail("newuser@example.com");
@@ -139,9 +147,9 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response3 = userService.register(createLoginRequest("user3@example.com", "pass3"));
 
         // Assert
-        assertThat(response1.isSuccess()).isTrue();
-        assertThat(response2.isSuccess()).isTrue();
-        assertThat(response3.isSuccess()).isTrue();
+        assertThat(response1.success()).isTrue();
+        assertThat(response2.success()).isTrue();
+        assertThat(response3.success()).isTrue();
 
         // Verify all persisted
         assertThat(userRepository.count()).isEqualTo(3);
@@ -161,7 +169,7 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response = userService.register(request);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.success()).isTrue();
 
         // Verify special characters persisted correctly
         Optional<UserEntity> savedUser = userRepository.findByEmail("special@example.com");
@@ -186,8 +194,8 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response = userService.login(request);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isEqualTo("Login successful");
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("Login successful");
     }
 
     @Test
@@ -227,7 +235,7 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse responseExact = userService.login(requestExactCase);
 
         // Assert
-        assertThat(responseExact.isSuccess()).isTrue();
+        assertThat(responseExact.success()).isTrue();
     }
 
     // ========== GET USER BY ID TESTS ==========
@@ -292,8 +300,8 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response = userService.updateUser(userId, updateRequest);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isEqualTo("User updated successfully");
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("User updated successfully");
 
         // Verify update persisted
         Optional<UserEntity> updatedUser = userRepository.findById(userId);
@@ -319,7 +327,7 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response = userService.updateUser(userId, updateRequest);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.success()).isTrue();
 
         // Verify new password persisted
         Optional<UserEntity> updatedUser = userRepository.findById(userId);
@@ -329,7 +337,7 @@ class UserServiceRepositoryIntegrationTest {
         // Verify can login with new password
         LoginRequest loginRequest = createLoginRequest("user@example.com", "newPassword");
         LoginResponse loginResponse = userService.login(loginRequest);
-        assertThat(loginResponse.isSuccess()).isTrue();
+        assertThat(loginResponse.success()).isTrue();
     }
 
     @Test
@@ -376,8 +384,8 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response = userService.deleteUser(userId);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isEqualTo("User deleted successfully");
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("User deleted successfully");
 
         // Verify deletion from database
         Optional<UserEntity> deletedUser = userRepository.findById(userId);
@@ -423,7 +431,7 @@ class UserServiceRepositoryIntegrationTest {
         // Register
         LoginRequest registerRequest = createLoginRequest("lifecycle@example.com", "password123");
         LoginResponse registerResponse = userService.register(registerRequest);
-        assertThat(registerResponse.isSuccess()).isTrue();
+        assertThat(registerResponse.success()).isTrue();
 
         // Verify user in database
         Optional<UserEntity> registeredUser = userRepository.findByEmail("lifecycle@example.com");
@@ -433,12 +441,12 @@ class UserServiceRepositoryIntegrationTest {
         // Login
         LoginRequest loginRequest = createLoginRequest("lifecycle@example.com", "password123");
         LoginResponse loginResponse = userService.login(loginRequest);
-        assertThat(loginResponse.isSuccess()).isTrue();
+        assertThat(loginResponse.success()).isTrue();
 
         // Update
         UserUpdateRequest updateRequest = createUserUpdateRequest("updated@example.com", "newPassword");
         LoginResponse updateResponse = userService.updateUser(userId, updateRequest);
-        assertThat(updateResponse.isSuccess()).isTrue();
+        assertThat(updateResponse.success()).isTrue();
 
         // Verify update in database
         Optional<UserEntity> updatedUser = userRepository.findById(userId);
@@ -448,11 +456,11 @@ class UserServiceRepositoryIntegrationTest {
         // Login with new credentials
         LoginRequest newLoginRequest = createLoginRequest("updated@example.com", "newPassword");
         LoginResponse newLoginResponse = userService.login(newLoginRequest);
-        assertThat(newLoginResponse.isSuccess()).isTrue();
+        assertThat(newLoginResponse.success()).isTrue();
 
         // Delete
         LoginResponse deleteResponse = userService.deleteUser(userId);
-        assertThat(deleteResponse.isSuccess()).isTrue();
+        assertThat(deleteResponse.success()).isTrue();
 
         // Verify deletion from database
         Optional<UserEntity> deletedUser = userRepository.findById(userId);
@@ -473,7 +481,7 @@ class UserServiceRepositoryIntegrationTest {
         // Successful login with correct password
         LoginRequest correctLoginRequest = createLoginRequest("workflow@example.com", "correctPassword");
         LoginResponse successLogin = userService.login(correctLoginRequest);
-        assertThat(successLogin.isSuccess()).isTrue();
+        assertThat(successLogin.success()).isTrue();
     }
 
     @Test
@@ -510,7 +518,7 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response = userService.register(request);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.success()).isTrue();
 
         // Verify persisted
         Optional<UserEntity> savedUser = userRepository.findByEmail("minpass@example.com");
@@ -530,7 +538,7 @@ class UserServiceRepositoryIntegrationTest {
         LoginResponse response = userService.register(request);
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.success()).isTrue();
 
         // Verify persisted with plus sign
         Optional<UserEntity> savedUser = userRepository.findByEmail("user+tag@example.com");

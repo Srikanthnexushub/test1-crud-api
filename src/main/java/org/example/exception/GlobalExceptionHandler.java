@@ -34,14 +34,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.error("Resource not found [traceId: {}]: {}", traceId, ex.getMessage());
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.NOT_FOUND.value())
-                .error("Resource Not Found")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Resource Not Found",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
@@ -52,14 +53,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.error("Duplicate resource [traceId: {}]: {}", traceId, ex.getMessage());
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error("Conflict")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
@@ -70,14 +72,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.warn("Invalid credentials attempt [traceId: {}]: {}", traceId, ex.getMessage());
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Unauthorized")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                "Unauthorized",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
@@ -88,14 +91,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.warn("Account locked attempt [traceId: {}]: {}", traceId, ex.getMessage());
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.LOCKED.value())
-                .error("Account Locked")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.LOCKED.value(),
+                "Account Locked",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.LOCKED).body(error);
     }
@@ -114,15 +118,15 @@ public class GlobalExceptionHandler {
 
         logger.warn("Validation failed [traceId: {}]: {}", traceId, validationErrors);
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("Validation Failed")
-                .message("Input validation failed")
-                .path(request.getRequestURI())
-                .validationErrors(validationErrors)
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Validation Failed",
+                "Input validation failed",
+                request.getRequestURI(),
+                validationErrors,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
@@ -141,15 +145,15 @@ public class GlobalExceptionHandler {
 
         logger.warn("Constraint violation [traceId: {}]: {}", traceId, validationErrors);
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("Validation Failed")
-                .message("Constraint validation failed")
-                .path(request.getRequestURI())
-                .validationErrors(validationErrors)
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Validation Failed",
+                "Constraint validation failed",
+                request.getRequestURI(),
+                validationErrors,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
@@ -165,14 +169,15 @@ public class GlobalExceptionHandler {
             message = "A record with this information already exists";
         }
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error("Conflict")
-                .message(message)
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                message,
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
@@ -183,14 +188,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.error("Malformed JSON request [traceId: {}]: {}", traceId, ex.getMessage());
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("Bad Request")
-                .message("Malformed JSON request")
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "Malformed JSON request",
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
@@ -204,14 +210,15 @@ public class GlobalExceptionHandler {
         String message = String.format("Invalid value '%s' for parameter '%s'",
                 ex.getValue(), ex.getName());
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("Bad Request")
-                .message(message)
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                message,
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
@@ -222,14 +229,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.warn("Authentication failed [traceId: {}]: {}", traceId, ex.getMessage());
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Unauthorized")
-                .message("Authentication failed")
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                "Unauthorized",
+                "Authentication failed",
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
@@ -240,14 +248,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.warn("Bad credentials [traceId: {}]", traceId);
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Unauthorized")
-                .message("Invalid email or password")
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                "Unauthorized",
+                "Invalid email or password",
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
@@ -258,14 +267,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.warn("Access denied [traceId: {}]: {}", traceId, ex.getMessage());
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.FORBIDDEN.value())
-                .error("Forbidden")
-                .message("Access denied")
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                "Access denied",
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
     }
@@ -276,14 +286,15 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.error("Unexpected error [traceId: {}]: ", traceId, ex);
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("Internal Server Error")
-                .message("An unexpected error occurred")
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Internal Server Error",
+                "An unexpected error occurred",
+                request.getRequestURI(),
+                null,
+                traceId
+        );
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }

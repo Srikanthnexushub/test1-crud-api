@@ -2,64 +2,23 @@ package org.example.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+/**
+ * Immutable login response DTO using Java Record.
+ * Optional fields (token, refreshToken) can be null.
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class LoginResponse {
-
-    private boolean success;
-    private String message;
-    private String token;
-    private String refreshToken;
-
-    public LoginResponse() {
-    }
-
+public record LoginResponse(
+    boolean success,
+    String message,
+    String token,
+    String refreshToken
+) {
+    // Compact constructors for convenience
     public LoginResponse(boolean success, String message) {
-        this.success = success;
-        this.message = message;
+        this(success, message, null, null);
     }
 
     public LoginResponse(boolean success, String message, String token) {
-        this.success = success;
-        this.message = message;
-        this.token = token;
-    }
-
-    public LoginResponse(boolean success, String message, String token, String refreshToken) {
-        this.success = success;
-        this.message = message;
-        this.token = token;
-        this.refreshToken = refreshToken;
-    }
-
-    public boolean isSuccess() {
-        return success;
-    }
-
-    public void setSuccess(boolean success) {
-        this.success = success;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
-
-    public String getRefreshToken() {
-        return refreshToken;
-    }
-
-    public void setRefreshToken(String refreshToken) {
-        this.refreshToken = refreshToken;
+        this(success, message, token, null);
     }
 }

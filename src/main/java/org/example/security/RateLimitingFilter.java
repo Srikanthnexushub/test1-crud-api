@@ -74,13 +74,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.TOO_MANY_REQUESTS.value())
-                .error("Too Many Requests")
-                .message("Rate limit exceeded. Please try again later.")
-                .path(request.getRequestURI())
-                .build();
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "Too Many Requests",
+                "Rate limit exceeded. Please try again later.",
+                request.getRequestURI(),
+                null,
+                null
+        );
 
         response.getWriter().write(objectMapper.writeValueAsString(error));
     }

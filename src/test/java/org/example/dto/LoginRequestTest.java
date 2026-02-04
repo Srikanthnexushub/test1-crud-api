@@ -27,18 +27,6 @@ class LoginRequestTest {
     }
 
     @Test
-    @DisplayName("Should create LoginRequest with default constructor")
-    void testDefaultConstructor() {
-        // Act
-        LoginRequest request = new LoginRequest();
-
-        // Assert
-        assertThat(request).isNotNull();
-        assertThat(request.getEmail()).isNull();
-        assertThat(request.getPassword()).isNull();
-    }
-
-    @Test
     @DisplayName("Should create LoginRequest with parameterized constructor")
     void testParameterizedConstructor() {
         // Act
@@ -46,23 +34,8 @@ class LoginRequestTest {
 
         // Assert
         assertThat(request).isNotNull();
-        assertThat(request.getEmail()).isEqualTo("test@example.com");
-        assertThat(request.getPassword()).isEqualTo("password123");
-    }
-
-    @Test
-    @DisplayName("Should set and get all fields correctly")
-    void testGettersAndSetters() {
-        // Arrange
-        LoginRequest request = new LoginRequest();
-
-        // Act
-        request.setEmail("setter@example.com");
-        request.setPassword("setterPassword");
-
-        // Assert
-        assertThat(request.getEmail()).isEqualTo("setter@example.com");
-        assertThat(request.getPassword()).isEqualTo("setterPassword");
+        assertThat(request.email()).isEqualTo("test@example.com");
+        assertThat(request.password()).isEqualTo("password123");
     }
 
     @Test
@@ -242,8 +215,8 @@ class LoginRequestTest {
 
         // Assert
         assertThat(request).isNotNull();
-        assertThat(request.getEmail()).isEqualTo("deserialize@example.com");
-        assertThat(request.getPassword()).isEqualTo("deserializePass");
+        assertThat(request.email()).isEqualTo("deserialize@example.com");
+        assertThat(request.password()).isEqualTo("deserializePass");
     }
 
     @Test
@@ -257,8 +230,8 @@ class LoginRequestTest {
 
         // Assert
         assertThat(request).isNotNull();
-        assertThat(request.getEmail()).isEqualTo("partial@example.com");
-        assertThat(request.getPassword()).isNull();
+        assertThat(request.email()).isEqualTo("partial@example.com");
+        assertThat(request.password()).isNull();
     }
 
     @Test
@@ -272,8 +245,8 @@ class LoginRequestTest {
 
         // Assert
         assertThat(request).isNotNull();
-        assertThat(request.getEmail()).isNull();
-        assertThat(request.getPassword()).isNull();
+        assertThat(request.email()).isNull();
+        assertThat(request.password()).isNull();
     }
 
     @Test

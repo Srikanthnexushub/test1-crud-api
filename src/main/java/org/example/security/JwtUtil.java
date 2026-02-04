@@ -3,7 +3,7 @@ package org.example.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
+import org.example.config.properties.JwtProperties;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -14,14 +14,23 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+/**
+ * JWT utility with maximum immutability:
+ * - All fields are final
+ * - Constructor injection only
+ */
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret:your-256-bit-secret-your-256-bit-secret-your-256-bit-secret}")
-    private String secret;
+    // Immutable configuration values
+    private final String secret;
+    private final long expiration;
 
-    @Value("${jwt.expiration:86400000}") // 24 hours in milliseconds
-    private Long expiration;
+    // Constructor injection (no @Autowired needed)
+    public JwtUtil(JwtProperties jwtProperties) {
+        this.secret = jwtProperties.getSecret();
+        this.expiration = jwtProperties.getExpiration();
+    }
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);

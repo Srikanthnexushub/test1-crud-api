@@ -18,18 +18,6 @@ class LoginResponseTest {
     }
 
     @Test
-    @DisplayName("Should create LoginResponse with default constructor")
-    void testDefaultConstructor() {
-        // Act
-        LoginResponse response = new LoginResponse();
-
-        // Assert
-        assertThat(response).isNotNull();
-        assertThat(response.isSuccess()).isFalse(); // Default boolean value is false
-        assertThat(response.getMessage()).isNull();
-    }
-
-    @Test
     @DisplayName("Should create LoginResponse with parameterized constructor")
     void testParameterizedConstructor() {
         // Act
@@ -37,23 +25,8 @@ class LoginResponseTest {
 
         // Assert
         assertThat(response).isNotNull();
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isEqualTo("Operation successful");
-    }
-
-    @Test
-    @DisplayName("Should set and get all fields correctly")
-    void testGettersAndSetters() {
-        // Arrange
-        LoginResponse response = new LoginResponse();
-
-        // Act
-        response.setSuccess(true);
-        response.setMessage("Test message");
-
-        // Assert
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isEqualTo("Test message");
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("Operation successful");
     }
 
     @Test
@@ -63,8 +36,8 @@ class LoginResponseTest {
         LoginResponse response = new LoginResponse(true, "User logged in successfully");
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isEqualTo("User logged in successfully");
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEqualTo("User logged in successfully");
     }
 
     @Test
@@ -74,8 +47,8 @@ class LoginResponseTest {
         LoginResponse response = new LoginResponse(false, "Invalid credentials");
 
         // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("Invalid credentials");
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).isEqualTo("Invalid credentials");
     }
 
     @Test
@@ -104,8 +77,8 @@ class LoginResponseTest {
 
         // Assert
         assertThat(response).isNotNull();
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("Deserialization test");
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).isEqualTo("Deserialization test");
     }
 
     @Test
@@ -119,8 +92,8 @@ class LoginResponseTest {
 
         // Assert
         assertThat(response).isNotNull();
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isNull();
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isNull();
     }
 
     @Test
@@ -134,8 +107,8 @@ class LoginResponseTest {
 
         // Assert
         assertThat(response).isNotNull();
-        assertThat(response.isSuccess()).isFalse(); // Default boolean value
-        assertThat(response.getMessage()).isEqualTo("Test message");
+        assertThat(response.success()).isFalse(); // Default boolean value
+        assertThat(response.message()).isEqualTo("Test message");
     }
 
     @Test
@@ -149,8 +122,8 @@ class LoginResponseTest {
 
         // Assert
         assertThat(response).isNotNull();
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isNull();
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isNull();
     }
 
     @Test
@@ -160,8 +133,8 @@ class LoginResponseTest {
         LoginResponse response = new LoginResponse(true, "");
 
         // Assert
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getMessage()).isEmpty();
+        assertThat(response.success()).isTrue();
+        assertThat(response.message()).isEmpty();
     }
 
     @Test
@@ -171,8 +144,8 @@ class LoginResponseTest {
         LoginResponse response = new LoginResponse(false, null);
 
         // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isNull();
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).isNull();
     }
 
     @Test
@@ -187,8 +160,8 @@ class LoginResponseTest {
         LoginResponse response = new LoginResponse(false, longMessage);
 
         // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo(longMessage);
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).isEqualTo(longMessage);
     }
 
     @Test
@@ -201,8 +174,8 @@ class LoginResponseTest {
         LoginResponse response = new LoginResponse(false, specialMessage);
 
         // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo(specialMessage);
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).isEqualTo(specialMessage);
     }
 
     @Test
@@ -216,8 +189,8 @@ class LoginResponseTest {
         LoginResponse deserialized = objectMapper.readValue(json, LoginResponse.class);
 
         // Assert
-        assertThat(deserialized.isSuccess()).isEqualTo(original.isSuccess());
-        assertThat(deserialized.getMessage()).isEqualTo(original.getMessage());
+        assertThat(deserialized.success()).isEqualTo(original.success());
+        assertThat(deserialized.message()).isEqualTo(original.message());
     }
 
     @Test
@@ -233,8 +206,8 @@ class LoginResponseTest {
 
         for (String message : successMessages) {
             LoginResponse response = new LoginResponse(true, message);
-            assertThat(response.isSuccess()).isTrue();
-            assertThat(response.getMessage()).isEqualTo(message);
+            assertThat(response.success()).isTrue();
+            assertThat(response.message()).isEqualTo(message);
         }
     }
 
@@ -251,24 +224,9 @@ class LoginResponseTest {
 
         for (String message : failureMessages) {
             LoginResponse response = new LoginResponse(false, message);
-            assertThat(response.isSuccess()).isFalse();
-            assertThat(response.getMessage()).isEqualTo(message);
+            assertThat(response.success()).isFalse();
+            assertThat(response.message()).isEqualTo(message);
         }
-    }
-
-    @Test
-    @DisplayName("Should toggle success status")
-    void testToggleSuccessStatus() {
-        // Arrange
-        LoginResponse response = new LoginResponse(true, "Initial message");
-
-        // Act
-        response.setSuccess(false);
-        response.setMessage("Updated message");
-
-        // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("Updated message");
     }
 
     @Test
@@ -281,9 +239,9 @@ class LoginResponseTest {
         LoginResponse response = new LoginResponse(false, messageWithLineBreaks);
 
         // Assert
-        assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo(messageWithLineBreaks);
-        assertThat(response.getMessage()).contains("\n");
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).isEqualTo(messageWithLineBreaks);
+        assertThat(response.message()).contains("\n");
     }
 
     @Test

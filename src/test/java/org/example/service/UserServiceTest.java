@@ -1,5 +1,6 @@
 package org.example.service;
 
+import org.example.config.properties.SecurityProperties;
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
 import org.example.dto.UserUpdateRequest;
@@ -50,6 +51,9 @@ class UserServiceTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private SecurityProperties securityProperties;
+
     @InjectMocks
     private UserService userService;
 
@@ -59,6 +63,10 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Setup security properties
+        lenient().when(securityProperties.getMaxFailedAttempts()).thenReturn(5);
+        lenient().when(securityProperties.getLockTimeDuration()).thenReturn(900000L); // 15 minutes
+
         testUser = new UserEntity("test@example.com", "hashed_password123");
         testUser.setId(1L);
 
@@ -98,8 +106,8 @@ class UserServiceTest {
 
         LoginResponse response = userService.login(loginRequest);
 
-        assertTrue(response.isSuccess());
-        assertEquals("Login successful", response.getMessage());
+        assertTrue(response.success());
+        assertEquals("Login successful", response.message());
         verify(userRepository, times(1)).findByEmail("test@example.com");
     }
 
@@ -134,8 +142,8 @@ class UserServiceTest {
         LoginRequest request = new LoginRequest("new@example.com", "password123");
         LoginResponse response = userService.register(request);
 
-        assertTrue(response.isSuccess());
-        assertEquals("Registration successful", response.getMessage());
+        assertTrue(response.success());
+        assertEquals("Registration successful", response.message());
         verify(userRepository, times(1)).save(any(UserEntity.class));
     }
 
@@ -181,8 +189,8 @@ class UserServiceTest {
         UserUpdateRequest request = new UserUpdateRequest("updated@example.com", "newpassword", null);
         LoginResponse response = userService.updateUser(1L, request);
 
-        assertTrue(response.isSuccess());
-        assertEquals("User updated successfully", response.getMessage());
+        assertTrue(response.success());
+        assertEquals("User updated successfully", response.message());
         verify(userRepository, times(1)).save(any(UserEntity.class));
     }
 
@@ -207,8 +215,8 @@ class UserServiceTest {
 
         LoginResponse response = userService.deleteUser(1L);
 
-        assertTrue(response.isSuccess());
-        assertEquals("User deleted successfully", response.getMessage());
+        assertTrue(response.success());
+        assertEquals("User deleted successfully", response.message());
         verify(userRepository, times(1)).deleteById(1L);
     }
 
@@ -323,7 +331,7 @@ class UserServiceTest {
 
         LoginResponse response = userService.register(request);
 
-        assertTrue(response.isSuccess());
+        assertTrue(response.success());
         verify(userRepository, times(1)).save(any(UserEntity.class));
     }
 
@@ -378,7 +386,7 @@ class UserServiceTest {
 
         try {
             LoginResponse response = userService.deleteUser(null);
-            assertFalse(response.isSuccess());
+            assertFalse(response.success());
         } catch (Exception e) {
             // Might throw exception with null ID
             assertTrue(true);
@@ -407,7 +415,7 @@ class UserServiceTest {
 
         LoginResponse response = userService.register(request);
 
-        assertTrue(response.isSuccess());
+        assertTrue(response.success());
         verify(userRepository, times(1)).save(any(UserEntity.class));
     }
 }
