@@ -38,11 +38,12 @@ services:
 
     # ports: Map container port to your machine's port
     # Format: "host_port:container_port"
-    # 5432:5432 means:
+    # 5434:5432 means:
     #   - PostgreSQL runs on port 5432 inside container
-    #   - Accessible on port 5432 on your machine (localhost:5432)
+    #   - Accessible on port 5434 on your machine (localhost:5434)
+    #   - Separate from local PostgreSQL on 5433
     ports:
-      - "5432:5432"
+      - "5434:5432"
 
     # volumes: Persist data even when container stops
     # Without volumes, data is lost when container stops
@@ -112,12 +113,19 @@ services:
       # SPRING_DATASOURCE_PASSWORD: Database password
       SPRING_DATASOURCE_PASSWORD: postgres
 
+      # DATABASE_PASSWORD: Database password (for compatibility)
+      DATABASE_PASSWORD: postgres
+
       # SPRING_JPA_HIBERNATE_DDL_AUTO: Auto-create tables from entities
       # update = create/update tables automatically
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
 
       # SPRING_JPA_SHOW_SQL: Log SQL queries (useful for debugging)
       SPRING_JPA_SHOW_SQL: "true"
+
+      # JWT_SECRET: Secret key for JWT token generation
+      # Must be at least 256 bits for HS256 algorithm
+      JWT_SECRET: "docker-secret-key-for-jwt-authentication-minimum-256-bits-required-for-hs256-algorithm-production-ready"
 
     # ports: Map application port
     # 8080:8080 means:
