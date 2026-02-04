@@ -2,6 +2,7 @@ package org.example.integration;
 
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.dto.UserUpdateRequest;
 import org.example.entity.Role;
 import org.example.entity.UserEntity;
 import org.example.repository.RoleRepository;
@@ -198,7 +199,7 @@ class TransactionBoundaryIntegrationTest {
         Long userId = user.getId();
 
         // Act & Assert - Try to update non-existent user should throw exception
-        LoginRequest updateRequest = new LoginRequest("updated@example.com", "newPassword");
+        UserUpdateRequest updateRequest = new UserUpdateRequest("updated@example.com", "newPassword", null);
         assertThrows(ResourceNotFoundException.class, () -> userService.updateUser(999L, updateRequest));
 
         // Verify original user data is unchanged
@@ -219,7 +220,7 @@ class TransactionBoundaryIntegrationTest {
         Long userId = user.getId();
 
         // Act
-        LoginRequest updateRequest = new LoginRequest("after@example.com", "newPassword");
+        UserUpdateRequest updateRequest = new UserUpdateRequest("after@example.com", "newPassword", null);
         LoginResponse response = userService.updateUser(userId, updateRequest);
 
         // Assert
@@ -341,13 +342,14 @@ class TransactionBoundaryIntegrationTest {
         assertThat(loginResponse.isSuccess()).isTrue();
 
         // 2. Update
-        LoginRequest updateRequest = new LoginRequest("updated@example.com", "password2");
+        UserUpdateRequest updateRequest = new UserUpdateRequest("updated@example.com", "password2", null);
         LoginResponse updateResponse = userService.updateUser(userId, updateRequest);
         assertThat(updateResponse.isSuccess()).isTrue();
         entityManager.flush();
 
         // 3. Login with new credentials
-        LoginResponse newLoginResponse = userService.login(updateRequest);
+        LoginRequest newLoginRequest = new LoginRequest("updated@example.com", "password2");
+        LoginResponse newLoginResponse = userService.login(newLoginRequest);
         assertThat(newLoginResponse.isSuccess()).isTrue();
 
         // 4. Delete
@@ -415,7 +417,7 @@ class TransactionBoundaryIntegrationTest {
         Long originalId = user.getId();
 
         // Act - Update via service
-        LoginRequest updateRequest = new LoginRequest("updated@example.com", "newPass");
+        UserUpdateRequest updateRequest = new UserUpdateRequest("updated@example.com", "newPass", null);
         userService.updateUser(originalId, updateRequest);
         entityManager.flush();
         entityManager.clear();

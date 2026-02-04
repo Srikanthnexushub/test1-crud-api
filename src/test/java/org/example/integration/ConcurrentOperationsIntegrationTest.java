@@ -2,6 +2,7 @@ package org.example.integration;
 
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.dto.UserUpdateRequest;
 import org.example.entity.UserEntity;
 import org.example.repository.UserRepository;
 import org.example.service.UserService;
@@ -183,7 +184,7 @@ class ConcurrentOperationsIntegrationTest {
             executorService.submit(() -> {
                 try {
                     startLatch.await();
-                    LoginRequest updateRequest = new LoginRequest("updated" + index + "@example.com", "newPass" + index);
+                    UserUpdateRequest updateRequest = new UserUpdateRequest("updated" + index + "@example.com", "newPass" + index, null);
                     userService.updateUser(userId, updateRequest);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -224,7 +225,7 @@ class ConcurrentOperationsIntegrationTest {
             executorService.submit(() -> {
                 try {
                     startLatch.await();
-                    LoginRequest updateRequest = new LoginRequest("updated" + index + "@example.com", "newPass" + index);
+                    UserUpdateRequest updateRequest = new UserUpdateRequest("updated" + index + "@example.com", "newPass" + index, null);
                     LoginResponse response = userService.updateUser(userIds.get(index), updateRequest);
                     if (response.isSuccess()) {
                         successCount.incrementAndGet();

@@ -2,6 +2,7 @@ package org.example.util;
 
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.dto.UserUpdateRequest;
 import org.example.entity.UserEntity;
 
 import java.util.Random;
@@ -140,6 +141,27 @@ public class TestDataBuilder {
     public static LoginRequest createRandomLoginRequest() {
         String randomEmail = "user" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
         return new LoginRequest(randomEmail, "password" + random.nextInt(10000));
+    }
+
+    /**
+     * Creates a UserUpdateRequest with specified email and password
+     */
+    public static UserUpdateRequest createUserUpdateRequest(String email, String password) {
+        return new UserUpdateRequest(email, password, null);
+    }
+
+    /**
+     * Creates a UserUpdateRequest with specified email, password, and role
+     */
+    public static UserUpdateRequest createUserUpdateRequest(String email, String password, String role) {
+        return new UserUpdateRequest(email, password, role);
+    }
+
+    /**
+     * Creates a UserUpdateRequest with default valid values
+     */
+    public static UserUpdateRequest createValidUserUpdateRequest() {
+        return new UserUpdateRequest(VALID_EMAIL, VALID_PASSWORD, null);
     }
 
     /**

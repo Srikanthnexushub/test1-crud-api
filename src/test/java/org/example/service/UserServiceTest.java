@@ -2,6 +2,7 @@ package org.example.service;
 
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.dto.UserUpdateRequest;
 import org.example.entity.Role;
 import org.example.entity.RefreshToken;
 import org.example.entity.UserEntity;
@@ -177,7 +178,7 @@ class UserServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(userRepository.save(any(UserEntity.class))).thenReturn(testUser);
 
-        LoginRequest request = new LoginRequest("updated@example.com", "newpassword");
+        UserUpdateRequest request = new UserUpdateRequest("updated@example.com", "newpassword", null);
         LoginResponse response = userService.updateUser(1L, request);
 
         assertTrue(response.isSuccess());
@@ -190,7 +191,7 @@ class UserServiceTest {
     void updateUser_WithInvalidId_ReturnsUserNotFound() {
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
-        LoginRequest request = new LoginRequest("updated@example.com", "newpassword");
+        UserUpdateRequest request = new UserUpdateRequest("updated@example.com", "newpassword", null);
 
         assertThrows(ResourceNotFoundException.class, () -> userService.updateUser(999L, request));
         verify(userRepository, never()).save(any(UserEntity.class));
@@ -292,7 +293,7 @@ class UserServiceTest {
     @Test
     @DisplayName("Update - Handle null fields gracefully")
     void testUpdateWithNullFields() {
-        LoginRequest request = new LoginRequest(null, null);
+        UserUpdateRequest request = new UserUpdateRequest(null, null, null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
 
         LoginResponse response = userService.updateUser(1L, request);
@@ -361,7 +362,7 @@ class UserServiceTest {
     @DisplayName("Update - Handle very long password")
     void testUpdateWithVeryLongPassword() {
         String longPassword = "a".repeat(200);
-        LoginRequest request = new LoginRequest("newemail@example.com", longPassword);
+        UserUpdateRequest request = new UserUpdateRequest("newemail@example.com", longPassword, null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
 
         LoginResponse response = userService.updateUser(1L, request);

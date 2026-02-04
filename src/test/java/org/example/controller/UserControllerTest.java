@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.config.TestSecurityConfig;
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.dto.UserUpdateRequest;
 import org.example.entity.UserEntity;
 import org.example.exception.InvalidCredentialsException;
 import org.example.exception.DuplicateResourceException;
@@ -144,7 +145,7 @@ class UserControllerTest {
     @Test
     @DisplayName("PUT /api/v1/users/{id} - Success")
     void updateUser_Success_Returns200() throws Exception {
-        when(userService.updateUser(eq(1L), any(LoginRequest.class)))
+        when(userService.updateUser(eq(1L), any(UserUpdateRequest.class)))
                 .thenReturn(new LoginResponse(true, "User updated successfully"));
 
         mockMvc.perform(put("/api/v1/users/1")
@@ -158,7 +159,7 @@ class UserControllerTest {
     @Test
     @DisplayName("PUT /api/v1/users/{id} - Fail returns 404")
     void updateUser_Fail_Returns400() throws Exception {
-        when(userService.updateUser(eq(999L), any(LoginRequest.class)))
+        when(userService.updateUser(eq(999L), any(UserUpdateRequest.class)))
                 .thenThrow(new ResourceNotFoundException("User not found with id: 999"));
 
         mockMvc.perform(put("/api/v1/users/999")

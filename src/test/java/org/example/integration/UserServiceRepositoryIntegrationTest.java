@@ -2,6 +2,7 @@ package org.example.integration;
 
 import org.example.dto.LoginRequest;
 import org.example.dto.LoginResponse;
+import org.example.dto.UserUpdateRequest;
 import org.example.entity.Role;
 import org.example.entity.UserEntity;
 import org.example.exception.DuplicateResourceException;
@@ -285,7 +286,7 @@ class UserServiceRepositoryIntegrationTest {
         entityManager.flush();
         Long userId = user.getId();
 
-        LoginRequest updateRequest = createLoginRequest("new@example.com", "password123");
+        UserUpdateRequest updateRequest = createUserUpdateRequest("new@example.com", "password123");
 
         // Act
         LoginResponse response = userService.updateUser(userId, updateRequest);
@@ -312,7 +313,7 @@ class UserServiceRepositoryIntegrationTest {
         entityManager.flush();
         Long userId = user.getId();
 
-        LoginRequest updateRequest = createLoginRequest("user@example.com", "newPassword");
+        UserUpdateRequest updateRequest = createUserUpdateRequest("user@example.com", "newPassword");
 
         // Act
         LoginResponse response = userService.updateUser(userId, updateRequest);
@@ -335,7 +336,7 @@ class UserServiceRepositoryIntegrationTest {
     @DisplayName("Should fail update when user ID not found in database")
     void testUpdateUser_UserNotFound_FailsWithDatabaseCheck() {
         // Arrange
-        LoginRequest updateRequest = createLoginRequest("new@example.com", "newPassword");
+        UserUpdateRequest updateRequest = createUserUpdateRequest("new@example.com", "newPassword");
 
         // Act & Assert
         assertThrows(ResourceNotFoundException.class, () -> userService.updateUser(999L, updateRequest));
@@ -349,7 +350,7 @@ class UserServiceRepositoryIntegrationTest {
         entityManager.flush();
         Long originalId = user.getId();
 
-        LoginRequest updateRequest = createLoginRequest("updated@example.com", "newPassword");
+        UserUpdateRequest updateRequest = createUserUpdateRequest("updated@example.com", "newPassword");
 
         // Act
         userService.updateUser(originalId, updateRequest);
@@ -435,7 +436,7 @@ class UserServiceRepositoryIntegrationTest {
         assertThat(loginResponse.isSuccess()).isTrue();
 
         // Update
-        LoginRequest updateRequest = createLoginRequest("updated@example.com", "newPassword");
+        UserUpdateRequest updateRequest = createUserUpdateRequest("updated@example.com", "newPassword");
         LoginResponse updateResponse = userService.updateUser(userId, updateRequest);
         assertThat(updateResponse.isSuccess()).isTrue();
 
@@ -484,7 +485,7 @@ class UserServiceRepositoryIntegrationTest {
         entityManager.flush();
 
         // Act - Update user1
-        LoginRequest updateRequest = createLoginRequest("user1updated@example.com", "newpass1");
+        UserUpdateRequest updateRequest = createUserUpdateRequest("user1updated@example.com", "newpass1");
         userService.updateUser(user1.getId(), updateRequest);
 
         // Assert - user2 should be unaffected
