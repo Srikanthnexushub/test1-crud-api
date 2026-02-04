@@ -6,6 +6,7 @@ import org.example.dto.UserUpdateRequest;
 import org.example.entity.UserEntity;
 import org.example.repository.UserRepository;
 import org.example.service.UserService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +49,22 @@ class ConcurrentOperationsIntegrationTest {
     void setUp() {
         userRepository.deleteAll();
         executorService = Executors.newFixedThreadPool(10);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+        userRepository.deleteAll();
     }
 
     // ========== CONCURRENT REGISTRATION TESTS ==========
@@ -342,11 +359,12 @@ class ConcurrentOperationsIntegrationTest {
     // ========== CONCURRENT LOGIN TESTS ==========
 
     @Test
-    @Disabled("Test isolation issue - passes individually but fails in full suite")
+    @Disabled("Exposes a real concurrency bug in RefreshTokenService.createRefreshToken() - the deleteByUser() call causes OptimisticLockingFailureException when multiple threads login simultaneously as the same user. This needs to be fixed at the application level with proper locking or retry mechanisms.")
     @DisplayName("Should handle concurrent login attempts")
     void testConcurrentLogins_SameUser_AllSucceed() throws InterruptedException {
         // Arrange - Create user with BCrypt hashed password
-        userRepository.save(new UserEntity("login@example.com", passwordEncoder.encode("password123")));
+        String testEmail = "concurrent-login-" + System.currentTimeMillis() + "@example.com";
+        userRepository.save(new UserEntity(testEmail, passwordEncoder.encode("password123")));
 
         int threadCount = 10;
         CountDownLatch startLatch = new CountDownLatch(1);
@@ -358,7 +376,7 @@ class ConcurrentOperationsIntegrationTest {
             executorService.submit(() -> {
                 try {
                     startLatch.await();
-                    LoginRequest request = new LoginRequest("login@example.com", "password123");
+                    LoginRequest request = new LoginRequest(testEmail, "password123");
                     LoginResponse response = userService.login(request);
                     if (response.isSuccess()) {
                         successCount.incrementAndGet();

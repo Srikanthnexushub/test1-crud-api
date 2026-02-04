@@ -306,7 +306,6 @@ class UserIntegrationTest {
     }
 
     @Test
-    @Disabled("Requires additional CORS configuration for test environment")
     @DisplayName("Should handle CORS headers")
     void testCorsHeaders() throws Exception {
         // Arrange
@@ -318,7 +317,8 @@ class UserIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
-            .andExpect(header().exists("Access-Control-Allow-Origin"));
+            .andExpect(header().exists("Access-Control-Allow-Origin"))
+            .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
     }
 
     @Test

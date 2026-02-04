@@ -41,10 +41,9 @@ class CorsConfigTest {
     }
 
     @Test
-    @Disabled("Requires additional CORS configuration for test environment")
-    @DisplayName("Should allow requests from any origin")
+    @DisplayName("Should allow requests from localhost origins")
     void testAllowedOrigins() throws Exception {
-        // Act & Assert - Test with different origins
+        // Act & Assert - Test with localhost origin (matches pattern)
         mockMvc.perform(options("/api/v1/users/login")
                 .header("Origin", "http://localhost:3000")
                 .header("Access-Control-Request-Method", "POST"))
@@ -52,10 +51,10 @@ class CorsConfigTest {
             .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
 
         mockMvc.perform(options("/api/v1/users/register")
-                .header("Origin", "https://example.com")
+                .header("Origin", "http://localhost:8080")
                 .header("Access-Control-Request-Method", "POST"))
             .andExpect(status().isOk())
-            .andExpect(header().string("Access-Control-Allow-Origin", "https://example.com"));
+            .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:8080"));
     }
 
     @Test
@@ -171,15 +170,14 @@ class CorsConfigTest {
     }
 
     @Test
-    @Disabled("Requires additional CORS configuration for test environment")
-    @DisplayName("Should work with different origin patterns")
+    @DisplayName("Should work with localhost origin patterns")
     void testDifferentOriginPatterns() throws Exception {
-        // Test with various origin formats
+        // Test with various localhost ports (matches http://localhost:* pattern)
         String[] origins = {
             "http://localhost:3000",
-            "https://example.com",
-            "http://app.example.com",
-            "https://subdomain.example.co.uk"
+            "http://localhost:8080",
+            "http://localhost:4200",
+            "http://localhost:5173"
         };
 
         for (String origin : origins) {
