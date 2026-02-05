@@ -267,11 +267,14 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString();
         logger.warn("Access denied [traceId: {}]: {}", traceId, ex.getMessage());
 
+        String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
+                ? ex.getMessage() : "Access denied";
+
         ErrorResponse error = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.FORBIDDEN.value(),
                 "Forbidden",
-                "Access denied",
+                message,
                 request.getRequestURI(),
                 null,
                 traceId

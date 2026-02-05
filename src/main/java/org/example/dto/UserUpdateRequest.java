@@ -2,7 +2,9 @@ package org.example.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import org.example.validation.NoHtml;
 
 /**
  * Immutable user update request DTO using Java Record.
@@ -11,11 +13,13 @@ import jakarta.validation.constraints.Size;
 public record UserUpdateRequest(
     @NotBlank(message = "Email is required")
     @Email(message = "Email should be valid")
+    @NoHtml
     String email,
 
     @Size(min = 6, max = 100, message = "Password must be between 6 and 100 characters")
     String password, // Optional - only update if provided
 
+    @Pattern(regexp = "^(ROLE_USER|ROLE_ADMIN|ROLE_MANAGER)?$", message = "Invalid role. Must be ROLE_USER, ROLE_ADMIN, or ROLE_MANAGER")
     String role // Optional - ROLE_USER, ROLE_ADMIN, ROLE_MANAGER
 ) {
 }

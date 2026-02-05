@@ -24,7 +24,13 @@ import org.example.service.RefreshTokenService;
 import org.example.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
+import java.util.List;
+import java.util.Map;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -93,7 +99,12 @@ public class UserController {
                 .map(refreshTokenService::verifyExpiration)
                 .map(RefreshToken::getUser)
                 .map(user -> {
-                    String newAccessToken = jwtUtil.generateToken(user.getEmail());
+                    // Include roles in refreshed token (same as login)
+                    List<String> roleNames = user.getRoles().stream()
+                            .map(role -> role.getName().name())
+                            .toList();
+                    Map<String, Object> claims = Map.of("roles", roleNames);
+                    String newAccessToken = jwtUtil.generateToken(user.getEmail(), claims);
                     return ResponseEntity.ok(new LoginResponse(true, "Token refreshed successfully", newAccessToken));
                 })
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid refresh token"));
@@ -111,7 +122,10 @@ public class UserController {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     public ResponseEntity<?> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+        List<UserResponse> users = userService.getAllUsers().stream()
+                .map(UserResponse::fromEntity)
+                .toList();
+        return ResponseEntity.ok(users);
     }
 
     @PostMapping
@@ -137,17 +151,17 @@ public class UserController {
     @Operation(summary = "Get user by ID", description = "Retrieves user details by their ID (requires authentication)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "User found",
-                    content = @Content(schema = @Schema(implementation = UserEntity.class))),
+                    content = @Content(schema = @Schema(implementation = UserResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "User not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    public ResponseEntity<UserEntity> getUserById(
+    public ResponseEntity<UserResponse> getUserById(
             @Parameter(description = "User ID", required = true, example = "1")
             @PathVariable Long id) {
         UserEntity user = userService.getUserById(id);
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(UserResponse.fromEntity(user));
     }
 
     @PutMapping("/{id}")
@@ -170,6 +184,20 @@ public class UserController {
             @PathVariable Long id,
             @Parameter(description = "Updated user details", required = true)
             @Valid @RequestBody UserUpdateRequest request) {
+        // Only allow admins or the user themselves to update
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()
+                && !"anonymousUser".equals(auth.getPrincipal())) {
+            boolean isAdmin = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            if (!isAdmin) {
+                UserEntity targetUser = userService.getUserById(id);
+                if (!targetUser.getEmail().equals(auth.getName())) {
+                    throw new AccessDeniedException("You can only update your own profile");
+                }
+            }
+        }
+
         LoginResponse response = userService.updateUser(id, request);
         return ResponseEntity.ok(response);
     }

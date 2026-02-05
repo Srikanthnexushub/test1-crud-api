@@ -181,12 +181,12 @@ class UserIntegrationTest {
 
         UserEntity savedUser = userRepository.findByEmail("getbyid@example.com").orElseThrow();
 
-        // Act & Assert
+        // Act & Assert - password should NOT be in response (security fix)
         mockMvc.perform(get("/api/v1/users/" + savedUser.getId()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(savedUser.getId()))
             .andExpect(jsonPath("$.email").value("getbyid@example.com"))
-            .andExpect(jsonPath("$.password").exists());
+            .andExpect(jsonPath("$.password").doesNotExist());
     }
 
     @Test

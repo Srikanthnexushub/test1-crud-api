@@ -7,6 +7,10 @@
 
 set -e  # Exit on error
 
+# Java Home (Homebrew OpenJDK 17)
+export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+export PATH="$JAVA_HOME/bin:$PATH"
+
 echo "🚀 Starting All Services (Local Mode)..."
 echo "=========================================="
 echo ""
@@ -107,7 +111,7 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # Start frontend in background
-nohup npm run dev > /tmp/frontend.log 2>&1 &
+nohup npm run dev > "$PROJECT_ROOT/logs/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 
 echo "  - Frontend started (PID: $FRONTEND_PID)"
@@ -166,7 +170,7 @@ echo "   • Frontend PID:    $FRONTEND_PID"
 echo ""
 echo "📝 Logs:"
 echo "   • Backend:         tail -f logs/application.log"
-echo "   • Frontend:        tail -f /tmp/frontend.log"
+echo "   • Frontend:        tail -f logs/frontend.log"
 echo ""
 echo "🔧 Management Commands:"
 echo "   • Stop services:   ./stop-services.sh"
