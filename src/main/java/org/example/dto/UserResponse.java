@@ -15,6 +15,8 @@ public record UserResponse(
     String email,
     List<String> roles,
     boolean accountLocked,
+    boolean emailVerified,
+    boolean twoFactorEnabled,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -27,6 +29,8 @@ public record UserResponse(
                 user.getEmail(),
                 roleNames,
                 user.isAccountLocked(),
+                user.isEmailVerified(),
+                user.isTwoFactorEnabled(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );

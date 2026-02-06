@@ -10,8 +10,11 @@ import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
 import org.example.security.JwtUtil;
 import org.example.service.AuditLogService;
+import org.example.service.EmailService;
 import org.example.service.RefreshTokenService;
+import org.example.service.TwoFactorService;
 import org.example.service.UserService;
+import org.example.service.VerificationTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,6 +63,9 @@ class TransactionBoundaryIntegrationTest {
     private JwtUtil jwtUtil;
     private AuditLogService auditLogService;
     private RefreshTokenService refreshTokenService;
+    private VerificationTokenService verificationTokenService;
+    private EmailService emailService;
+    private TwoFactorService twoFactorService;
     private SecurityProperties securityProperties;
 
     @BeforeEach
@@ -74,6 +80,9 @@ class TransactionBoundaryIntegrationTest {
         jwtUtil = mock(JwtUtil.class);
         auditLogService = mock(AuditLogService.class);
         refreshTokenService = mock(RefreshTokenService.class);
+        verificationTokenService = mock(VerificationTokenService.class);
+        emailService = mock(EmailService.class);
+        twoFactorService = mock(TwoFactorService.class);
         securityProperties = mock(SecurityProperties.class);
 
         // Mock default role for registration
@@ -89,13 +98,18 @@ class TransactionBoundaryIntegrationTest {
         mockRefreshToken.setToken("mock-refresh-token");
         when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
 
+        // Mock verification token service
+        when(verificationTokenService.createEmailVerificationToken(org.mockito.ArgumentMatchers.any())).thenReturn("mock-verification-token");
+
         // Mock security properties
         when(securityProperties.getMaxFailedAttempts()).thenReturn(5);
         when(securityProperties.getLockTimeDuration()).thenReturn(900000L); // 15 minutes
 
         // Manually instantiate UserService with all dependencies
         userService = new UserService(userRepository, roleRepository, passwordEncoder,
-                                     jwtUtil, auditLogService, refreshTokenService, securityProperties);
+                                     jwtUtil, auditLogService, refreshTokenService,
+                                     verificationTokenService, emailService, twoFactorService,
+                                     securityProperties);
     }
 
     // ========== CONSTRAINT VIOLATION TESTS ==========

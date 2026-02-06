@@ -4,10 +4,8 @@ import org.example.config.properties.SecurityProperties;
 import org.example.dto.*;
 import org.example.entity.Role;
 import org.example.entity.UserEntity;
-import org.example.exception.AccountLockedException;
-import org.example.exception.DuplicateResourceException;
-import org.example.exception.InvalidCredentialsException;
-import org.example.exception.ResourceNotFoundException;
+import org.example.entity.VerificationToken.TokenType;
+import org.example.exception.*;
 import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
 import org.example.security.JwtUtil;
@@ -41,6 +39,9 @@ public class UserService {
     private final JwtUtil jwtUtil;
     private final AuditLogService auditLogService;
     private final RefreshTokenService refreshTokenService;
+    private final VerificationTokenService verificationTokenService;
+    private final EmailService emailService;
+    private final TwoFactorService twoFactorService;
 
     // Immutable configuration values
     private final int maxFailedAttempts;
@@ -54,6 +55,9 @@ public class UserService {
             JwtUtil jwtUtil,
             AuditLogService auditLogService,
             RefreshTokenService refreshTokenService,
+            VerificationTokenService verificationTokenService,
+            EmailService emailService,
+            TwoFactorService twoFactorService,
             SecurityProperties securityProperties
     ) {
         this.userRepository = userRepository;
@@ -62,6 +66,9 @@ public class UserService {
         this.jwtUtil = jwtUtil;
         this.auditLogService = auditLogService;
         this.refreshTokenService = refreshTokenService;
+        this.verificationTokenService = verificationTokenService;
+        this.emailService = emailService;
+        this.twoFactorService = twoFactorService;
         this.maxFailedAttempts = securityProperties.getMaxFailedAttempts();
         this.lockTimeDuration = securityProperties.getLockTimeDuration();
     }
@@ -83,19 +90,21 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("Default role not found. System initialization failed."));
         user.addRole(userRole);
 
+        // User starts as unverified
+        user.setEmailVerified(false);
+
         userRepository.save(user);
 
-        // Create immutable claims map for JWT
-        Map<String, Object> claims = createJwtClaims(List.of(userRole));
+        // Send verification email
+        String verificationToken = verificationTokenService.createEmailVerificationToken(user);
+        emailService.sendVerificationEmail(user, verificationToken);
 
-        String token = jwtUtil.generateToken(user.getEmail(), claims);
-        String refreshToken = refreshTokenService.createRefreshToken(user.getEmail()).getToken();
-        logger.info("User registered successfully: {}", request.email());
+        logger.info("User registered successfully (pending verification): {}", request.email());
 
-        auditLogService.logSuccess("USER_REGISTER", "New user registered: " + user.getEmail(),
+        auditLogService.logSuccess("USER_REGISTER", "New user registered (pending verification): " + user.getEmail(),
                                     user.getId(), "USER");
 
-        return new LoginResponse(true, "Registration successful", token, refreshToken);
+        return new LoginResponse(true, "Registration successful. Please check your email to verify your account.");
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -106,6 +115,12 @@ public class UserService {
                     logger.warn("Login failed - user not found: {}", request.email());
                     return new InvalidCredentialsException("Invalid email or password");
                 });
+
+        // Check if email is verified (blocking)
+        if (!user.isEmailVerified()) {
+            logger.warn("Login failed - email not verified for user: {}", request.email());
+            throw new EmailNotVerifiedException("Email not verified. Please check your email and verify your account.");
+        }
 
         // Check if account is locked
         if (user.isAccountLocked()) {
@@ -128,6 +143,19 @@ public class UserService {
         // Successful login - reset failed attempts
         if (user.getFailedLoginAttempts() > 0) {
             resetFailedAttempts(user);
+        }
+
+        // Check if 2FA is enabled
+        if (user.isTwoFactorEnabled()) {
+            // Generate a partial token that requires 2FA verification
+            Map<String, Object> partialClaims = new HashMap<>();
+            partialClaims.put("2fa_required", true);
+            partialClaims.put("2fa_verified", false);
+            partialClaims.put("partial", true);
+            String partialToken = jwtUtil.generateToken(user.getEmail(), partialClaims);
+
+            logger.info("2FA required for user: {}", request.email());
+            throw new TwoFactorRequiredException("Two-factor authentication required", partialToken);
         }
 
         // Create immutable claims map for JWT
@@ -331,5 +359,133 @@ public class UserService {
                                     id, "USER");
 
         return new LoginResponse(true, "User deleted successfully");
+    }
+
+    // ==========================================
+    // EMAIL VERIFICATION METHODS
+    // ==========================================
+
+    public LoginResponse verifyEmail(String token) {
+        logger.info("Email verification attempt with token");
+
+        UserEntity user = verificationTokenService.validateToken(token, TokenType.EMAIL_VERIFICATION);
+
+        user.setEmailVerified(true);
+        user.setEmailVerifiedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        verificationTokenService.markTokenUsed(token);
+
+        logger.info("Email verified successfully for user: {}", user.getEmail());
+        auditLogService.logSuccess("EMAIL_VERIFY", "Email verified: " + user.getEmail(),
+                                    user.getId(), "USER");
+
+        return new LoginResponse(true, "Email verified successfully. You can now log in.");
+    }
+
+    public LoginResponse resendVerificationEmail(String email) {
+        logger.info("Resend verification email request for: {}", email);
+
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+
+        if (user.isEmailVerified()) {
+            return new LoginResponse(true, "Email is already verified");
+        }
+
+        String verificationToken = verificationTokenService.createEmailVerificationToken(user);
+        emailService.sendVerificationEmail(user, verificationToken);
+
+        logger.info("Verification email resent to: {}", email);
+        return new LoginResponse(true, "Verification email sent. Please check your inbox.");
+    }
+
+    // ==========================================
+    // PASSWORD RESET METHODS
+    // ==========================================
+
+    public LoginResponse forgotPassword(String email) {
+        logger.info("Password reset request for: {}", email);
+
+        Optional<UserEntity> userOptional = userRepository.findByEmail(email);
+        if (userOptional.isEmpty()) {
+            // Don't reveal if email exists for security
+            logger.warn("Password reset requested for non-existent email: {}", email);
+            return new LoginResponse(true, "If the email exists, a password reset link has been sent.");
+        }
+
+        UserEntity user = userOptional.get();
+        String resetToken = verificationTokenService.createPasswordResetToken(user);
+        emailService.sendPasswordResetEmail(user, resetToken);
+
+        logger.info("Password reset email sent to: {}", email);
+        return new LoginResponse(true, "If the email exists, a password reset link has been sent.");
+    }
+
+    public LoginResponse resetPassword(String token, String newPassword) {
+        logger.info("Password reset attempt with token");
+
+        UserEntity user = verificationTokenService.validateToken(token, TokenType.PASSWORD_RESET);
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        verificationTokenService.markTokenUsed(token);
+
+        // Invalidate all refresh tokens for security
+        refreshTokenService.revokeAllUserTokens(user);
+
+        logger.info("Password reset successfully for user: {}", user.getEmail());
+        auditLogService.logSuccess("PASSWORD_RESET", "Password reset: " + user.getEmail(),
+                                    user.getId(), "USER");
+
+        return new LoginResponse(true, "Password reset successfully. You can now log in with your new password.");
+    }
+
+    // ==========================================
+    // 2FA LOGIN VERIFICATION
+    // ==========================================
+
+    public LoginResponse verify2FALogin(String email, String code) {
+        logger.info("2FA verification attempt for: {}", email);
+
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!user.isTwoFactorEnabled()) {
+            throw new Invalid2FACodeException("2FA is not enabled for this user");
+        }
+
+        boolean isValid = twoFactorService.verifyCode(user.getTwoFactorSecret(), code);
+
+        if (!isValid) {
+            // Try backup code
+            isValid = twoFactorService.useBackupCode(user, code);
+        }
+
+        if (!isValid) {
+            logger.warn("Invalid 2FA code for user: {}", email);
+            throw new Invalid2FACodeException("Invalid verification code");
+        }
+
+        // Generate full access token
+        Map<String, Object> claims = createJwtClaims(user.getRoles());
+        claims = new HashMap<>(claims);
+        ((Map<String, Object>) claims).put("2fa_verified", true);
+
+        String token = jwtUtil.generateToken(user.getEmail(), claims);
+        String refreshToken = refreshTokenService.createRefreshToken(user.getEmail()).getToken();
+
+        logger.info("2FA verified, user logged in: {}", email);
+        auditLogService.logSuccess("USER_LOGIN_2FA", "User logged in with 2FA: " + user.getEmail(),
+                                    user.getId(), "USER");
+
+        return new LoginResponse(true, "Login successful", token, refreshToken);
+    }
+
+    @Transactional(readOnly = true)
+    public UserEntity getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
     }
 }

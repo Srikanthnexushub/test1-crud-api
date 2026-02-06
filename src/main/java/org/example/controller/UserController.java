@@ -10,12 +10,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.example.dto.*;
-import org.example.dto.ErrorResponse;
-import org.example.dto.LoginRequest;
-import org.example.dto.LoginResponse;
-import org.example.dto.RefreshTokenRequest;
-import org.example.dto.UserCreateRequest;
-import org.example.dto.UserUpdateRequest;
 import org.example.entity.RefreshToken;
 import org.example.entity.UserEntity;
 import org.example.exception.InvalidCredentialsException;
@@ -220,6 +214,72 @@ public class UserController {
             @Parameter(description = "User ID", required = true, example = "1")
             @PathVariable Long id) {
         LoginResponse response = userService.deleteUser(id);
+        return ResponseEntity.ok(response);
+    }
+
+    // ==========================================
+    // EMAIL VERIFICATION ENDPOINTS
+    // ==========================================
+
+    @PostMapping("/verify-email")
+    @Operation(summary = "Verify email", description = "Verifies user's email address using the token sent via email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Email verified successfully",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired token",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<LoginResponse> verifyEmail(
+            @Parameter(description = "Email verification request", required = true)
+            @Valid @RequestBody VerifyEmailRequest request) {
+        LoginResponse response = userService.verifyEmail(request.token());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/resend-verification")
+    @Operation(summary = "Resend verification email", description = "Resends the email verification link")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Verification email sent",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "404", description = "User not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<LoginResponse> resendVerification(
+            @Parameter(description = "Resend verification request", required = true)
+            @Valid @RequestBody ResendVerificationRequest request) {
+        LoginResponse response = userService.resendVerificationEmail(request.email());
+        return ResponseEntity.ok(response);
+    }
+
+    // ==========================================
+    // PASSWORD RESET ENDPOINTS
+    // ==========================================
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Forgot password", description = "Sends a password reset link to the user's email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset email sent (if email exists)",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class)))
+    })
+    public ResponseEntity<LoginResponse> forgotPassword(
+            @Parameter(description = "Forgot password request", required = true)
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        LoginResponse response = userService.forgotPassword(request.email());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password", description = "Resets the user's password using the token sent via email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset successfully",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired token",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<LoginResponse> resetPassword(
+            @Parameter(description = "Reset password request", required = true)
+            @Valid @RequestBody ResetPasswordRequest request) {
+        LoginResponse response = userService.resetPassword(request.token(), request.newPassword());
         return ResponseEntity.ok(response);
     }
 }

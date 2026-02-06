@@ -50,6 +50,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
                         .requestMatchers("/api/v1/users/register", "/api/v1/users/login", "/api/v1/users/refresh").permitAll()
+                        // Email verification and password reset (public)
+                        .requestMatchers("/api/v1/users/verify-email", "/api/v1/users/resend-verification").permitAll()
+                        .requestMatchers("/api/v1/users/forgot-password", "/api/v1/users/reset-password").permitAll()
+                        // 2FA verification during login (public with partial token)
+                        .requestMatchers("/api/v1/auth/2fa/verify", "/api/v1/auth/2fa/backup-code").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                         .requestMatchers("/error").permitAll()

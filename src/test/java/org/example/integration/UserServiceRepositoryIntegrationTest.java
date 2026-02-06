@@ -13,8 +13,11 @@ import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
 import org.example.security.JwtUtil;
 import org.example.service.AuditLogService;
+import org.example.service.EmailService;
 import org.example.service.RefreshTokenService;
+import org.example.service.TwoFactorService;
 import org.example.service.UserService;
+import org.example.service.VerificationTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,6 +63,9 @@ class UserServiceRepositoryIntegrationTest {
     private JwtUtil jwtUtil;
     private AuditLogService auditLogService;
     private RefreshTokenService refreshTokenService;
+    private VerificationTokenService verificationTokenService;
+    private EmailService emailService;
+    private TwoFactorService twoFactorService;
     private SecurityProperties securityProperties;
 
     @BeforeEach
@@ -73,6 +79,9 @@ class UserServiceRepositoryIntegrationTest {
         jwtUtil = mock(JwtUtil.class);
         auditLogService = mock(AuditLogService.class);
         refreshTokenService = mock(RefreshTokenService.class);
+        verificationTokenService = mock(VerificationTokenService.class);
+        emailService = mock(EmailService.class);
+        twoFactorService = mock(TwoFactorService.class);
         securityProperties = mock(SecurityProperties.class);
 
         // Mock default role for registration
@@ -88,13 +97,18 @@ class UserServiceRepositoryIntegrationTest {
         mockRefreshToken.setToken("mock-refresh-token");
         when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
 
+        // Mock verification token service
+        when(verificationTokenService.createEmailVerificationToken(any())).thenReturn("mock-verification-token");
+
         // Mock security properties
         when(securityProperties.getMaxFailedAttempts()).thenReturn(5);
         when(securityProperties.getLockTimeDuration()).thenReturn(900000L); // 15 minutes
 
         // Manually instantiate UserService with all dependencies
         userService = new UserService(userRepository, roleRepository, passwordEncoder,
-                                     jwtUtil, auditLogService, refreshTokenService, securityProperties);
+                                     jwtUtil, auditLogService, refreshTokenService,
+                                     verificationTokenService, emailService, twoFactorService,
+                                     securityProperties);
     }
 
     // ========== REGISTRATION TESTS ==========
@@ -110,7 +124,7 @@ class UserServiceRepositoryIntegrationTest {
 
         // Assert
         assertThat(response.success()).isTrue();
-        assertThat(response.message()).isEqualTo("Registration successful");
+        assertThat(response.message()).contains("Registration successful");
 
         // Verify persistence in database
         Optional<UserEntity> savedUser = userRepository.findByEmail("newuser@example.com");
@@ -118,6 +132,8 @@ class UserServiceRepositoryIntegrationTest {
         assertThat(savedUser.get().getEmail()).isEqualTo("newuser@example.com");
         assertThat(passwordEncoder.matches("password123", savedUser.get().getPassword())).isTrue();
         assertThat(savedUser.get().getId()).isNotNull();
+        // New users should be unverified
+        assertThat(savedUser.get().isEmailVerified()).isFalse();
     }
 
     @Test
@@ -183,8 +199,9 @@ class UserServiceRepositoryIntegrationTest {
     @Test
     @DisplayName("Should login successfully with valid credentials from database")
     void testLogin_ValidCredentials_SuccessWithDatabaseLookup() {
-        // Arrange - Create user with BCrypt hashed password
+        // Arrange - Create user with BCrypt hashed password and mark as verified
         UserEntity user = createUserEntity("login@example.com", passwordEncoder.encode("password123"));
+        user.setEmailVerified(true);  // Must be verified to login
         userRepository.save(user);
         entityManager.flush();
 
@@ -211,8 +228,9 @@ class UserServiceRepositoryIntegrationTest {
     @Test
     @DisplayName("Should fail login when password does not match database record")
     void testLogin_InvalidPassword_FailsWithDatabaseComparison() {
-        // Arrange
-        UserEntity user = createUserEntity("user@example.com", "correctPassword");
+        // Arrange - user must be verified for password check to occur
+        UserEntity user = createUserEntity("user@example.com", passwordEncoder.encode("correctPassword"));
+        user.setEmailVerified(true);
         userRepository.save(user);
         entityManager.flush();
 
@@ -225,8 +243,9 @@ class UserServiceRepositoryIntegrationTest {
     @Test
     @DisplayName("Should handle case-sensitive email lookup in database")
     void testLogin_CaseSensitiveEmail_HandledCorrectly() {
-        // Arrange - Create user with BCrypt hashed password
+        // Arrange - Create user with BCrypt hashed password and mark as verified
         UserEntity user = createUserEntity("Test@Example.com", passwordEncoder.encode("password123"));
+        user.setEmailVerified(true);
         userRepository.save(user);
         entityManager.flush();
 

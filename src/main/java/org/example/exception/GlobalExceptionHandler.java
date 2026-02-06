@@ -104,6 +104,98 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.LOCKED).body(error);
     }
 
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ErrorResponse> handleEmailNotVerified(
+            EmailNotVerifiedException ex, HttpServletRequest request) {
+        String traceId = UUID.randomUUID().toString();
+        logger.warn("Email not verified [traceId: {}]: {}", traceId, ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.FORBIDDEN.value(),
+                "Email Not Verified",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                traceId
+        );
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    @ExceptionHandler(InvalidVerificationTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidVerificationToken(
+            InvalidVerificationTokenException ex, HttpServletRequest request) {
+        String traceId = UUID.randomUUID().toString();
+        logger.warn("Invalid verification token [traceId: {}]: {}", traceId, ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Invalid Token",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                traceId
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(TokenExpiredException.class)
+    public ResponseEntity<ErrorResponse> handleTokenExpired(
+            TokenExpiredException ex, HttpServletRequest request) {
+        String traceId = UUID.randomUUID().toString();
+        logger.warn("Token expired [traceId: {}]: {}", traceId, ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Token Expired",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                traceId
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(TwoFactorRequiredException.class)
+    public ResponseEntity<Map<String, Object>> handleTwoFactorRequired(
+            TwoFactorRequiredException ex, HttpServletRequest request) {
+        String traceId = UUID.randomUUID().toString();
+        logger.info("2FA required [traceId: {}]: {}", traceId, ex.getMessage());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", ex.getMessage());
+        response.put("twoFactorRequired", true);
+        response.put("partialToken", ex.getPartialToken());
+        response.put("traceId", traceId);
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    @ExceptionHandler(Invalid2FACodeException.class)
+    public ResponseEntity<ErrorResponse> handleInvalid2FACode(
+            Invalid2FACodeException ex, HttpServletRequest request) {
+        String traceId = UUID.randomUUID().toString();
+        logger.warn("Invalid 2FA code [traceId: {}]: {}", traceId, ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                "Invalid 2FA Code",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                traceId
+        );
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(
             MethodArgumentNotValidException ex, HttpServletRequest request) {
