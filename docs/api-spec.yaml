@@ -1,0 +1,1203 @@
+openapi: 3.0.3
+info:
+  title: CRUD API
+  description: |
+    Enterprise-grade REST API for user management with authentication,
+    email verification, and two-factor authentication.
+
+    ## Authentication
+
+    Most endpoints require JWT authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+    ## Rate Limiting
+
+    API is rate-limited to 100 requests per minute per IP address.
+    Exceeding this limit returns `429 Too Many Requests`.
+
+    ## Error Handling
+
+    All errors return a consistent `ErrorResponse` structure with:
+    - `traceId` for support tickets
+    - `validationErrors` for field-level issues
+
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Development
+  - url: https://api.example.com/api/v1
+    description: Production
+
+tags:
+  - name: Authentication
+    description: User registration, login, and token management
+  - name: Users
+    description: User CRUD operations
+  - name: Email Verification
+    description: Email verification endpoints
+  - name: Password Reset
+    description: Password recovery endpoints
+  - name: Two-Factor Authentication
+    description: TOTP-based 2FA management
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ============================================================
+  # AUTHENTICATION ENDPOINTS
+  # ============================================================
+  /users/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: |
+        Creates a new user account. A verification email is sent automatically.
+        Users must verify their email before they can login.
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: user@example.com
+              password: SecurePass123
+      responses:
+        '200':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: Registration successful. Please verify your email.
+                token: null
+                refreshToken: null
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: "2026-02-07T10:30:00"
+                status: 409
+                error: Conflict
+                message: Email already registered
+                path: /api/v1/users/register
+                traceId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+  /users/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: |
+        Authenticates user credentials. Returns JWT tokens on success.
+
+        **2FA Flow**: If user has 2FA enabled, returns `403` with `twoFactorRequired: true`
+        and a `partialToken`. Use this token with `/auth/2fa/verify` to complete login.
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: user@example.com
+              password: SecurePass123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: Login successful
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                refreshToken: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 2FA required or email not verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorRequiredResponse'
+              example:
+                success: false
+                message: 2FA verification required
+                twoFactorRequired: true
+                partialToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                traceId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        '423':
+          description: Account locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: "2026-02-07T10:30:00"
+                status: 423
+                error: Locked
+                message: Account locked due to too many failed attempts. Try again in 15 minutes.
+                path: /api/v1/users/login
+                traceId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+  /users/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Generates a new access token using a valid refresh token.
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+            example:
+              refreshToken: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: Token refreshed successfully
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                refreshToken: null
+        '400':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================
+  # USER MANAGEMENT ENDPOINTS
+  # ============================================================
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Get all users
+      description: Retrieves a list of all users. Requires ADMIN role.
+      operationId: getAllUsers
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Users
+      summary: Create user (Admin)
+      description: Creates a new user with specified role. Requires ADMIN role.
+      operationId: createUser
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+            example:
+              email: newuser@example.com
+              password: SecurePass123
+              role: ROLE_USER
+      responses:
+        '200':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Retrieves user details by their ID.
+      operationId: getUserById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: |
+        Updates user information. Users can only update their own profile
+        unless they have ADMIN role.
+      operationId: updateUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+            example:
+              email: updated@example.com
+              password: NewSecurePass123
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Deletes a user account. Requires ADMIN role.
+      operationId: deleteUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '200':
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: User deleted successfully
+                token: null
+                refreshToken: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # EMAIL VERIFICATION ENDPOINTS
+  # ============================================================
+  /users/verify-email:
+    post:
+      tags:
+        - Email Verification
+      summary: Verify email address
+      description: Verifies user's email address using the token sent via email.
+      operationId: verifyEmail
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
+            example:
+              token: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: Email verified successfully
+                token: null
+                refreshToken: null
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/resend-verification:
+    post:
+      tags:
+        - Email Verification
+      summary: Resend verification email
+      description: Resends the email verification link to the user's email.
+      operationId: resendVerification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationRequest'
+            example:
+              email: user@example.com
+      responses:
+        '200':
+          description: Verification email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: Verification email sent
+                token: null
+                refreshToken: null
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # PASSWORD RESET ENDPOINTS
+  # ============================================================
+  /users/forgot-password:
+    post:
+      tags:
+        - Password Reset
+      summary: Request password reset
+      description: |
+        Sends a password reset link to the user's email.
+
+        **Security Note**: Returns 200 regardless of whether email exists
+        to prevent email enumeration attacks.
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+            example:
+              email: user@example.com
+      responses:
+        '200':
+          description: Password reset email sent (if account exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: If an account exists with this email, a password reset link has been sent.
+                token: null
+                refreshToken: null
+
+  /users/reset-password:
+    post:
+      tags:
+        - Password Reset
+      summary: Reset password
+      description: Resets the user's password using the token sent via email.
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+            example:
+              token: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+              newPassword: NewSecurePass123
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: Password reset successfully
+                token: null
+                refreshToken: null
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================
+  # TWO-FACTOR AUTHENTICATION ENDPOINTS
+  # ============================================================
+  /auth/2fa/setup:
+    post:
+      tags:
+        - Two-Factor Authentication
+      summary: Setup 2FA
+      description: |
+        Initiates 2FA setup and returns a QR code for authenticator apps.
+
+        The `qrCodeUrl` is a data URI containing a PNG image of the QR code.
+        The `secret` can be used for manual entry if QR scanning fails.
+      operationId: setup2FA
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 2FA setup data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorSetupResponse'
+              example:
+                success: true
+                message: Scan the QR code with your authenticator app
+                secret: JBSWY3DPEHPK3PXP
+                qrCodeUrl: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/2fa/enable:
+    post:
+      tags:
+        - Two-Factor Authentication
+      summary: Enable 2FA
+      description: |
+        Verifies the TOTP code and enables 2FA for the user.
+        Returns backup codes that should be stored securely.
+      operationId: enable2FA
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Verify2FARequest'
+            example:
+              code: "123456"
+      responses:
+        '200':
+          description: 2FA enabled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enable2FAResponse'
+              example:
+                success: true
+                message: 2FA enabled successfully
+                secret: null
+                qrCodeUrl: null
+                backupCodes:
+                  - "A1B2C3D4"
+                  - "E5F6G7H8"
+                  - "I9J0K1L2"
+                  - "M3N4O5P6"
+                  - "Q7R8S9T0"
+                  - "U1V2W3X4"
+                  - "Y5Z6A7B8"
+                  - "C9D0E1F2"
+                  - "G3H4I5J6"
+                  - "K7L8M9N0"
+        '400':
+          description: Invalid verification code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/2fa/disable:
+    post:
+      tags:
+        - Two-Factor Authentication
+      summary: Disable 2FA
+      description: Disables 2FA after verifying the current TOTP code.
+      operationId: disable2FA
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Disable2FARequest'
+            example:
+              code: "123456"
+      responses:
+        '200':
+          description: 2FA disabled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: 2FA disabled successfully
+                token: null
+                refreshToken: null
+        '400':
+          description: Invalid verification code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/2fa/verify:
+    post:
+      tags:
+        - Two-Factor Authentication
+      summary: Verify 2FA code during login
+      description: |
+        Verifies the 2FA code during login and returns full access tokens.
+
+        **Required Header**: `X-2FA-Email` with the user's email address.
+      operationId: verify2FA
+      security: []
+      parameters:
+        - name: X-2FA-Email
+          in: header
+          required: true
+          description: Email of user completing 2FA login
+          schema:
+            type: string
+            format: email
+            example: user@example.com
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Verify2FARequest'
+            example:
+              code: "123456"
+      responses:
+        '200':
+          description: 2FA verified, login complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: Login successful
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                refreshToken: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        '401':
+          description: Invalid verification code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/2fa/backup-codes:
+    post:
+      tags:
+        - Two-Factor Authentication
+      summary: Regenerate backup codes
+      description: |
+        Generates new backup codes, invalidating all existing ones.
+        Store these codes securely as they can only be viewed once.
+      operationId: regenerateBackupCodes
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: New backup codes generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enable2FAResponse'
+              example:
+                success: true
+                message: Backup codes regenerated
+                secret: null
+                qrCodeUrl: null
+                backupCodes:
+                  - "A1B2C3D4"
+                  - "E5F6G7H8"
+                  - "I9J0K1L2"
+                  - "M3N4O5P6"
+                  - "Q7R8S9T0"
+        '400':
+          description: 2FA not enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/2fa/backup-code:
+    post:
+      tags:
+        - Two-Factor Authentication
+      summary: Use backup code for login
+      description: |
+        Uses a backup code to complete 2FA during login.
+        Each backup code can only be used once.
+
+        **Required Header**: `X-2FA-Email` with the user's email address.
+      operationId: useBackupCode
+      security: []
+      parameters:
+        - name: X-2FA-Email
+          in: header
+          required: true
+          description: Email of user completing 2FA login
+          schema:
+            type: string
+            format: email
+            example: user@example.com
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorBackupCodeRequest'
+            example:
+              backupCode: "A1B2C3D4"
+      responses:
+        '200':
+          description: Backup code verified, login complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: Login successful
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                refreshToken: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        '401':
+          description: Invalid backup code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+# ============================================================
+# COMPONENTS
+# ============================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token obtained from login
+
+  schemas:
+    # --------------------------------------------------------
+    # REQUEST SCHEMAS
+    # --------------------------------------------------------
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: User email address
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          maxLength: 100
+          description: User password (min 6 characters)
+          example: SecurePass123
+
+    UserCreateRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: User email address
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          maxLength: 100
+          description: User password (min 6 characters)
+          example: SecurePass123
+        role:
+          type: string
+          enum:
+            - ROLE_USER
+            - ROLE_ADMIN
+            - ROLE_MANAGER
+          description: User role (defaults to ROLE_USER)
+          example: ROLE_USER
+
+    UserUpdateRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: User email address
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          maxLength: 100
+          description: New password (optional)
+          example: NewSecurePass123
+        role:
+          type: string
+          enum:
+            - ROLE_USER
+            - ROLE_ADMIN
+            - ROLE_MANAGER
+          description: User role (admin only)
+          example: ROLE_USER
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh token from login response
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    VerifyEmailRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: Verification token from email
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    ResendVerificationRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address to resend verification
+          example: user@example.com
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address for password reset
+          example: user@example.com
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - newPassword
+      properties:
+        token:
+          type: string
+          description: Password reset token from email
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          description: New password (min 8 characters)
+          example: NewSecurePass123
+
+    Verify2FARequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+          description: 6-digit TOTP code from authenticator app
+          example: "123456"
+
+    Disable2FARequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+          description: 6-digit TOTP code to confirm disabling
+          example: "123456"
+
+    TwoFactorBackupCodeRequest:
+      type: object
+      required:
+        - backupCode
+      properties:
+        backupCode:
+          type: string
+          description: One-time backup code
+          example: A1B2C3D4
+
+    # --------------------------------------------------------
+    # RESPONSE SCHEMAS
+    # --------------------------------------------------------
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Operation success status
+          example: true
+        message:
+          type: string
+          description: Response message
+          example: Login successful
+        token:
+          type: string
+          nullable: true
+          description: JWT access token (15 min expiry)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          nullable: true
+          description: Refresh token (7 day expiry)
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: User ID
+          example: 1
+        email:
+          type: string
+          format: email
+          description: User email
+          example: user@example.com
+        roles:
+          type: array
+          items:
+            type: string
+          description: User roles
+          example: ["ROLE_USER"]
+        accountLocked:
+          type: boolean
+          description: Account lock status
+          example: false
+        emailVerified:
+          type: boolean
+          description: Email verification status
+          example: true
+        twoFactorEnabled:
+          type: boolean
+          description: 2FA enabled status
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: "2026-02-07T10:30:00"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2026-02-07T10:30:00"
+
+    TwoFactorSetupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Scan the QR code with your authenticator app
+        secret:
+          type: string
+          nullable: true
+          description: Raw TOTP secret for manual entry
+          example: JBSWY3DPEHPK3PXP
+        qrCodeUrl:
+          type: string
+          nullable: true
+          description: Data URI containing QR code PNG
+          example: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+
+    Enable2FAResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 2FA enabled successfully
+        secret:
+          type: string
+          nullable: true
+        qrCodeUrl:
+          type: string
+          nullable: true
+        backupCodes:
+          type: array
+          items:
+            type: string
+          description: One-time backup codes (store securely)
+          example: ["A1B2C3D4", "E5F6G7H8", "I9J0K1L2"]
+
+    TwoFactorRequiredResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: 2FA verification required
+        twoFactorRequired:
+          type: boolean
+          example: true
+        partialToken:
+          type: string
+          description: Temporary token for 2FA verification
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        traceId:
+          type: string
+          format: uuid
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+          example: "2026-02-07T10:30:00"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        error:
+          type: string
+          description: Error type
+          example: Bad Request
+        message:
+          type: string
+          description: Error message
+          example: Validation failed
+        path:
+          type: string
+          description: Request path
+          example: /api/v1/users/register
+        validationErrors:
+          type: object
+          additionalProperties:
+            type: string
+          description: Field-level validation errors
+          example:
+            email: must be a valid email address
+            password: size must be between 6 and 100
+        traceId:
+          type: string
+          format: uuid
+          description: Unique error ID for support
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+          nullable: true
+        data:
+          type: object
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+          nullable: true
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2026-02-07T10:30:00"
+            status: 401
+            error: Unauthorized
+            message: Authentication required
+            path: /api/v1/users
+            traceId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2026-02-07T10:30:00"
+            status: 403
+            error: Forbidden
+            message: Access denied
+            path: /api/v1/users
+            traceId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2026-02-07T10:30:00"
+            status: 404
+            error: Not Found
+            message: User not found
+            path: /api/v1/users/999
+            traceId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2026-02-07T10:30:00"
+            status: 400
+            error: Bad Request
+            message: Validation failed
+            path: /api/v1/users/register
+            validationErrors:
+              email: must be a valid email address
+              password: size must be between 6 and 100
+            traceId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
