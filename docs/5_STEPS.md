@@ -71,6 +71,44 @@ SECRET 10: BLAMELESS CULTURE
   → "What" happened, not "who" did it
   → Share learnings widely
   → Psychological safety = faster recovery
+
+SECRET 11: SELF-HEALING SYSTEMS
+  → Systems that fix themselves without human intervention
+  → Auto-restart crashed containers (Kubernetes)
+  → Auto-scale on load spikes
+  → Auto-rollback on error rate spike
+  → Circuit breakers that auto-recover
+  → Netflix: Services recover in seconds, not hours
+
+SECRET 12: SELF-MONITORING & ANOMALY DETECTION
+  → ML-based anomaly detection (no manual thresholds)
+  → Predictive alerts BEFORE failures occur
+  → Auto-baseline from historical data
+  → Auto-correlation of events
+  → Amazon: Predicts failures 30 minutes before they happen
+
+SECRET 13: AUTO-REMEDIATION
+  → Runbooks that execute automatically
+  → Auto-restart services on failure
+  → Auto-clear cache when stale
+  → Auto-block malicious IPs
+  → Auto-scale database connections
+  → Google: 70% of incidents resolved without human touch
+
+SECRET 14: IMMUTABLE INFRASTRUCTURE
+  → Never modify running servers
+  → Replace, don't repair
+  → Every deploy is a fresh instance
+  → Rollback = deploy previous image
+  → Netflix: Servers are "cattle, not pets"
+
+SECRET 15: EVERYTHING AS CODE
+  → Infrastructure as Code (Terraform)
+  → Configuration as Code
+  → Alerts as Code
+  → Dashboards as Code
+  → Runbooks as Code
+  → GitOps: Git is the single source of truth
 ```
 
 ---
@@ -1967,6 +2005,688 @@ EXHAUSTED (Budget = 0%):
 - Emergency fixes only
 - Incident review required
 - Leadership escalation
+```
+
+---
+
+# SELF-HEALING SYSTEMS
+
+## What is Self-Healing?
+
+```
+Self-healing systems automatically detect and recover from failures
+without human intervention. This is how Netflix achieves 99.99% uptime.
+
+HUMAN INTERVENTION:
+1. Alert fires
+2. On-call wakes up
+3. Human investigates
+4. Human applies fix
+5. Service recovers
+→ MTTR: 30 minutes to 2 hours
+
+SELF-HEALING:
+1. System detects failure
+2. System applies fix automatically
+3. System recovers
+4. Alert sent as FYI
+→ MTTR: Seconds to minutes
+```
+
+## Self-Healing Components
+
+```
+1. CONTAINER AUTO-RESTART (Kubernetes/ECS)
+
+   spec:
+     containers:
+     - name: app
+       livenessProbe:
+         httpGet:
+           path: /health/live
+           port: 8080
+         initialDelaySeconds: 30
+         periodSeconds: 10
+         failureThreshold: 3  # Restart after 3 failures
+       readinessProbe:
+         httpGet:
+           path: /health/ready
+           port: 8080
+         periodSeconds: 5
+         failureThreshold: 2  # Remove from LB after 2 failures
+
+   BEHAVIOR:
+   - Container crashes → Kubernetes restarts it (seconds)
+   - Health check fails → Remove from load balancer
+   - Repeated crashes → Back-off restart (prevents crash loops)
+   - Node fails → Reschedule to healthy node
+
+2. AUTO-SCALING (Horizontal Pod Autoscaler)
+
+   apiVersion: autoscaling/v2
+   kind: HorizontalPodAutoscaler
+   spec:
+     minReplicas: 3
+     maxReplicas: 100
+     metrics:
+     - type: Resource
+       resource:
+         name: cpu
+         target:
+           type: Utilization
+           averageUtilization: 70
+     - type: Pods
+       pods:
+         metric:
+           name: requests_per_second
+         target:
+           type: AverageValue
+           averageValue: "1000"
+     behavior:
+       scaleUp:
+         stabilizationWindowSeconds: 60
+         policies:
+         - type: Percent
+           value: 100
+           periodSeconds: 60
+       scaleDown:
+         stabilizationWindowSeconds: 300
+
+   BEHAVIOR:
+   - CPU > 70% → Add more pods (within 60 seconds)
+   - RPS > 1000/pod → Add more pods
+   - Load decreases → Scale down (after 5 min stability)
+   - Sudden spike → Double capacity immediately
+
+3. CIRCUIT BREAKERS (Resilience4j/Hystrix)
+
+   CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+       .failureRateThreshold(50)           // Open at 50% failures
+       .slowCallRateThreshold(50)          // Open at 50% slow calls
+       .slowCallDurationThreshold(Duration.ofSeconds(2))
+       .waitDurationInOpenState(Duration.ofSeconds(30))  // Auto-retry after 30s
+       .permittedNumberOfCallsInHalfOpenState(10)
+       .minimumNumberOfCalls(20)
+       .slidingWindowSize(100)
+       .build();
+
+   STATES:
+   CLOSED (normal):
+   - All requests go through
+   - Failures are counted
+
+   OPEN (failing):
+   - Requests fail fast (don't call failing service)
+   - Return fallback response
+   - Wait 30 seconds
+
+   HALF-OPEN (testing):
+   - Allow 10 test requests
+   - If successful → CLOSED
+   - If failing → OPEN again
+
+4. AUTO-ROLLBACK (Argo Rollouts/Flagger)
+
+   spec:
+     strategy:
+       canary:
+         steps:
+         - setWeight: 5
+         - pause: {duration: 5m}
+         - analysis:
+             templates:
+             - templateName: success-rate
+         - setWeight: 25
+         - pause: {duration: 5m}
+         - setWeight: 50
+         - pause: {duration: 5m}
+         - setWeight: 100
+     analysis:
+       metrics:
+       - name: success-rate
+         successCondition: result >= 0.99
+         failureCondition: result < 0.95
+         provider:
+           prometheus:
+             query: |
+               sum(rate(http_requests_total{status=~"2.."}[5m]))
+               /
+               sum(rate(http_requests_total[5m]))
+
+   BEHAVIOR:
+   - Success rate < 95% → Auto-rollback
+   - Latency > threshold → Auto-rollback
+   - New errors detected → Auto-rollback
+   - All automatic, no human needed
+
+5. DATABASE CONNECTION RECOVERY
+
+   HikariConfig config = new HikariConfig();
+   config.setConnectionTimeout(5000);      // Fail fast
+   config.setValidationTimeout(3000);
+   config.setMaximumPoolSize(20);
+   config.setMinimumIdle(5);
+   config.setIdleTimeout(300000);          // 5 min
+   config.setMaxLifetime(600000);          // 10 min
+   config.setConnectionTestQuery("SELECT 1");
+   config.setLeakDetectionThreshold(60000);
+
+   // Auto-recovery
+   config.setInitializationFailTimeout(-1); // Keep trying
+   config.setKeepaliveTime(30000);          // Keep connections alive
+
+   BEHAVIOR:
+   - Connection dies → Pool creates new one
+   - Database restart → Auto-reconnect
+   - Connection leak → Auto-detect and log
+   - Pool exhausted → Queue and retry
+
+6. CACHE AUTO-RECOVERY
+
+   @Cacheable(value = "users", unless = "#result == null")
+   @CacheEvict(value = "users", allEntries = true,
+               condition = "@cacheManager.getCache('users').getNativeCache().size() > 10000")
+   public User getUser(Long id) {
+       return userRepository.findById(id);
+   }
+
+   // Redis with fallback
+   public User getUser(Long id) {
+       try {
+           return cache.get("user:" + id, User.class);
+       } catch (RedisConnectionException e) {
+           log.warn("Cache unavailable, falling back to DB");
+           return userRepository.findById(id); // Graceful degradation
+       }
+   }
+
+   BEHAVIOR:
+   - Cache miss → Load from DB, populate cache
+   - Cache full → Auto-evict oldest entries
+   - Redis down → Fall back to database
+   - Redis recovers → Auto-warm critical data
+```
+
+## Self-Healing Checklist
+
+```
+□ Containers restart on crash (liveness probe)
+□ Unhealthy containers removed from LB (readiness probe)
+□ Auto-scaling on CPU/memory/custom metrics
+□ Circuit breakers on all external calls
+□ Auto-rollback on error rate spike
+□ Database connection auto-recovery
+□ Cache fallback to database
+□ Retry with exponential backoff
+□ Timeout on all external calls
+□ Dead letter queue for failed async jobs
+□ Auto-restart for background workers
+□ Self-healing Kubernetes nodes
+```
+
+---
+
+# SELF-MONITORING & ANOMALY DETECTION
+
+## What is Self-Monitoring?
+
+```
+Traditional Monitoring:
+- Human sets threshold: "Alert if CPU > 80%"
+- Human sets threshold: "Alert if latency > 500ms"
+- Human sets threshold: "Alert if error rate > 1%"
+→ Thresholds become stale
+→ Too many false positives
+→ Alert fatigue
+
+Self-Monitoring:
+- System learns normal behavior automatically
+- System detects anomalies (deviations from normal)
+- System predicts failures before they happen
+- System auto-adjusts thresholds
+→ Fewer false positives
+→ Catch issues humans would miss
+→ Proactive, not reactive
+```
+
+## Self-Monitoring Components
+
+```
+1. ANOMALY DETECTION (ML-Based)
+
+   Tools: Datadog Anomaly Monitor, AWS Lookout, Prometheus + Prophet
+
+   # Datadog Anomaly Monitor
+   monitors:
+     - name: "API Latency Anomaly"
+       type: "anomaly"
+       query: "avg:http.request.latency{service:api}"
+       algorithm: "agile"      # Adapts quickly to changes
+       deviations: 3           # Alert at 3 sigma
+       seasonality: "weekly"   # Learns weekly patterns
+
+   BEHAVIOR:
+   - Learns baseline from 2+ weeks of data
+   - Detects deviation from expected pattern
+   - Adjusts for time of day, day of week
+   - No manual threshold needed
+
+   Example:
+   - Normal latency: 50ms (weekday), 30ms (weekend)
+   - Friday 2pm: 150ms detected
+   - System knows this is 3x normal for Friday 2pm
+   - Alert: "Latency anomaly detected"
+
+2. PREDICTIVE ALERTING
+
+   # Prometheus + Prophet for prediction
+   - alert: DiskWillFillIn4Hours
+     expr: |
+       predict_linear(node_filesystem_avail_bytes[1h], 4*3600) < 0
+     for: 30m
+     labels:
+       severity: warning
+     annotations:
+       description: "Disk will be full in ~4 hours at current rate"
+
+   - alert: ErrorRateTrending
+     expr: |
+       deriv(http_errors_total[1h]) > 10
+     for: 15m
+     labels:
+       severity: warning
+     annotations:
+       description: "Error rate is increasing, will breach SLO soon"
+
+   BEHAVIOR:
+   - Predict disk full before it happens
+   - Predict SLO breach before it happens
+   - Predict memory leak before OOM
+   - Act BEFORE failure, not after
+
+3. AUTO-BASELINE
+
+   # Automatic baseline calculation
+   - record: http_latency:baseline:avg
+     expr: |
+       avg_over_time(http_request_duration_seconds[7d])
+
+   - record: http_latency:baseline:stddev
+     expr: |
+       stddev_over_time(http_request_duration_seconds[7d])
+
+   # Dynamic threshold alert
+   - alert: LatencyHigh
+     expr: |
+       http_request_duration_seconds
+       > (http_latency:baseline:avg + 3 * http_latency:baseline:stddev)
+     for: 5m
+
+   BEHAVIOR:
+   - No hardcoded thresholds
+   - Baseline updates automatically
+   - Works for any metric
+   - Adapts to system changes
+
+4. AUTO-CORRELATION
+
+   # Automatic event correlation
+   When multiple alerts fire:
+   - API latency high
+   - Database connections high
+   - Error rate increased
+
+   System correlates:
+   "Database connection saturation is causing API latency
+    which is causing increased errors"
+
+   Root cause: Database connections
+   Action: Scale database or increase pool
+
+   Tools: PagerDuty Event Intelligence, BigPanda, Moogsoft
+
+5. SYNTHETIC MONITORING
+
+   # Datadog Synthetics / Pingdom / Custom
+   synthetic_tests:
+     - name: "Critical User Journey"
+       type: "browser"
+       frequency: "1m"
+       locations:
+         - "aws:us-east-1"
+         - "aws:eu-west-1"
+         - "aws:ap-southeast-1"
+       steps:
+         - goto: "https://app.example.com"
+         - click: "#login-button"
+         - type: { selector: "#email", value: "test@test.com" }
+         - type: { selector: "#password", value: "{{ env.SYNTH_PASSWORD }}" }
+         - click: "#submit"
+         - assert: { selector: "#dashboard", visible: true }
+       assertions:
+         - type: "responseTime"
+           operator: "lessThan"
+           target: 3000
+
+     - name: "API Health"
+       type: "api"
+       frequency: "30s"
+       request:
+         method: "GET"
+         url: "https://api.example.com/health"
+       assertions:
+         - type: "statusCode"
+           operator: "is"
+           target: 200
+         - type: "responseTime"
+           operator: "lessThan"
+           target: 500
+
+   BEHAVIOR:
+   - Tests run every 30-60 seconds
+   - From multiple global locations
+   - Detect outages in < 2 minutes
+   - Detect before real users affected
+   - Measure real user experience
+
+6. SLO BURN RATE ALERTS (Google SRE Method)
+
+   # Instead of: "Alert if error rate > 1%"
+   # Use: "Alert if burning error budget too fast"
+
+   # Fast burn (2% budget in 1 hour = page immediately)
+   - alert: SLOFastBurn
+     expr: |
+       (
+         sum(rate(http_errors_total[1h])) / sum(rate(http_requests_total[1h]))
+       ) > (14.4 * 0.001)  # 14.4x burn rate
+     for: 2m
+     labels:
+       severity: critical
+       page: "true"
+
+   # Slow burn (10% budget in 6 hours = ticket)
+   - alert: SLOSlowBurn
+     expr: |
+       (
+         sum(rate(http_errors_total[6h])) / sum(rate(http_requests_total[6h]))
+       ) > (6 * 0.001)  # 6x burn rate
+     for: 15m
+     labels:
+       severity: warning
+
+   WHY THIS IS BETTER:
+   - 1% error rate for 1 minute = no alert (not burning budget)
+   - 0.5% error rate for 10 hours = alert (burning budget fast)
+   - Focuses on user impact, not arbitrary thresholds
+
+7. DISTRIBUTED TRACING ANALYSIS
+
+   # Jaeger / Zipkin / Datadog APM
+   Auto-detect:
+   - Slow spans (> p95 baseline)
+   - Error spans
+   - Retry storms
+   - Circular dependencies
+   - N+1 queries
+
+   Example insight:
+   "getUserProfile is slow because:
+    1. getUser calls getUserPreferences (OK)
+    2. getUserPreferences calls getNotificationSettings 50 times (N+1)
+    3. Fix: Batch the notification settings query"
+
+   No human analysis needed.
+
+8. COST ANOMALY DETECTION
+
+   # AWS Cost Anomaly Detection / Custom
+   - Baseline: $100/day for compute
+   - Today: $500/day detected
+   - Alert: "Cost anomaly: Compute 5x normal"
+
+   Auto-investigate:
+   - New deployment? No
+   - Traffic spike? No
+   - Runaway process? YES - found container with memory leak
+
+   Auto-action:
+   - Kill runaway container
+   - Alert team
+   - Revert if needed
+```
+
+## Self-Monitoring Checklist
+
+```
+□ Anomaly detection on key metrics (latency, errors, traffic)
+□ Predictive alerts (disk, memory, SLO breach)
+□ Auto-baseline calculation (no manual thresholds)
+□ Event correlation (find root cause)
+□ Synthetic monitoring (test before users find issues)
+□ SLO burn rate alerts (Google SRE method)
+□ Distributed tracing analysis
+□ Cost anomaly detection
+□ Service dependency mapping (auto-discovered)
+□ Capacity prediction
+□ Security anomaly detection (unusual access patterns)
+□ Performance regression detection
+```
+
+---
+
+# AUTO-REMEDIATION
+
+## What is Auto-Remediation?
+
+```
+MANUAL REMEDIATION:
+1. Alert fires
+2. Human receives page
+3. Human reads runbook
+4. Human executes commands
+5. Problem fixed
+→ Time: 15 minutes to 1 hour
+
+AUTO-REMEDIATION:
+1. Alert fires
+2. System executes runbook automatically
+3. Problem fixed
+4. Human notified (FYI)
+→ Time: 30 seconds to 2 minutes
+```
+
+## Auto-Remediation Examples
+
+```
+1. AUTO-RESTART SERVICE
+
+   Trigger: Health check fails 3 times
+   Action:
+   - kubectl rollout restart deployment/api-server
+
+   PagerDuty Automation:
+   {
+     "trigger": "service_health_check_failed",
+     "conditions": {
+       "consecutive_failures": 3
+     },
+     "actions": [
+       {
+         "type": "webhook",
+         "url": "https://automation.example.com/restart",
+         "payload": { "service": "{{ service_name }}" }
+       },
+       {
+         "type": "notify",
+         "severity": "low",
+         "message": "Auto-restarted {{ service_name }}"
+       }
+     ]
+   }
+
+2. AUTO-CLEAR CACHE
+
+   Trigger: Cache hit rate < 50% or stale data detected
+   Action:
+   - redis-cli FLUSHDB
+   - Warm critical keys
+
+   # Automated script
+   if cache_hit_rate < 0.5:
+       redis.flushdb()
+       warm_cache(critical_keys)
+       notify("Cache cleared and warmed")
+
+3. AUTO-SCALE DATABASE CONNECTIONS
+
+   Trigger: Connection pool > 80% utilized
+   Action:
+   - Increase pool size temporarily
+   - Alert for permanent fix
+
+   # Auto-scaling config
+   dynamic_pool:
+     initial_size: 10
+     max_size: 50
+     scale_up_threshold: 0.8
+     scale_down_threshold: 0.3
+     scale_increment: 5
+
+4. AUTO-BLOCK MALICIOUS IPS
+
+   Trigger: Rate limit exceeded 10x or attack pattern detected
+   Action:
+   - Add IP to WAF blocklist
+   - Alert security team
+
+   # AWS WAF automation
+   if request_rate > 10 * rate_limit:
+       waf.add_to_blocklist(ip)
+       security_team.notify(f"Blocked {ip} for rate limit abuse")
+
+5. AUTO-KILL RUNAWAY PROCESSES
+
+   Trigger: Memory > 90% or CPU 100% for 5 minutes
+   Action:
+   - Identify runaway process
+   - Kill process
+   - Restart service
+   - Alert
+
+   # Kubernetes resource limits (automatic)
+   resources:
+     limits:
+       memory: "512Mi"
+       cpu: "1"
+   # Exceeding = OOMKill = auto-restart
+
+6. AUTO-ROTATE SECRETS
+
+   Trigger: Secret age > 90 days or exposure detected
+   Action:
+   - Generate new secret
+   - Update secret store
+   - Rolling restart services
+   - Invalidate old secret
+
+   # AWS Secrets Manager rotation
+   rotation_rules:
+     automatically_after_days: 90
+   rotation_lambda: arn:aws:lambda:...:rotate-db-password
+
+7. AUTO-FAILOVER DATABASE
+
+   Trigger: Primary database unresponsive
+   Action:
+   - Promote replica to primary
+   - Update connection strings
+   - Alert DBA team
+
+   # AWS RDS Multi-AZ (automatic)
+   - Primary fails
+   - RDS promotes standby (< 60 seconds)
+   - DNS updated automatically
+   - Application auto-reconnects
+
+8. AUTO-REMEDIATION RUNBOOK (Rundeck/StackStorm)
+
+   # Runbook as Code
+   name: "High Error Rate Remediation"
+   trigger:
+     alert: "error_rate_high"
+     threshold: 5  # 5% error rate
+
+   steps:
+     - name: "Check recent deployments"
+       command: "kubectl rollout history deployment/api"
+       on_match: "deployment in last 30 min"
+       action: "rollback"
+
+     - name: "Check database connectivity"
+       command: "pg_isready -h $DB_HOST"
+       on_failure:
+         action: "restart_connection_pool"
+
+     - name: "Check memory usage"
+       command: "kubectl top pods"
+       on_match: "memory > 90%"
+       action: "restart_pod"
+
+     - name: "Check external dependencies"
+       command: "curl -s https://api.dependency.com/health"
+       on_failure:
+         action: "enable_circuit_breaker"
+
+     - name: "Escalate if not resolved"
+       condition: "error_rate still > 5%"
+       action: "page_oncall"
+```
+
+## Auto-Remediation Checklist
+
+```
+□ Auto-restart failed containers
+□ Auto-rollback bad deployments
+□ Auto-scale on load
+□ Auto-clear stale cache
+□ Auto-block malicious traffic
+□ Auto-kill runaway processes
+□ Auto-rotate secrets
+□ Auto-failover database
+□ Auto-reconnect database
+□ Runbook automation (Rundeck/StackStorm)
+□ PagerDuty/Opsgenie automation
+□ Auto-remediation audit log
+```
+
+## Auto-Remediation Safety
+
+```
+GUARDRAILS:
+□ Rate limit remediations (max 3 per hour)
+□ Require confirmation for destructive actions
+□ Always notify after remediation
+□ Audit log all auto-actions
+□ Kill switch to disable automation
+□ Dry-run mode for testing
+□ Rollback capability for auto-actions
+□ Escalate if auto-remediation fails
+
+WHAT TO AUTOMATE:
+✓ Restarts and rollbacks
+✓ Scaling up/down
+✓ Cache operations
+✓ Block malicious traffic
+✓ Database failover
+✓ Secret rotation
+
+WHAT NOT TO AUTOMATE (without guardrails):
+⚠ Data deletion
+⚠ Production database writes
+⚠ Customer communication
+⚠ Billing changes
+⚠ Security policy changes
 ```
 
 ---
