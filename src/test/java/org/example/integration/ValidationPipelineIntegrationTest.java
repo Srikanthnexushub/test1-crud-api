@@ -3,6 +3,7 @@ package org.example.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.dto.LoginRequest;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,9 @@ class ValidationPipelineIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -47,11 +51,13 @@ class ValidationPipelineIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
     @AfterEach
     void tearDown() {
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -350,6 +356,7 @@ class ValidationPipelineIntegrationTest {
     void testValidationConsistency_LoginEndpoint() throws Exception {
         // Register a valid user first - use PasswordEncoder to hash the password
         org.example.entity.UserEntity user = new org.example.entity.UserEntity("login@example.com", passwordEncoder.encode("password123"));
+        user.setEmailVerified(true);
         userRepository.save(user);
 
         // Test 1: Invalid email format

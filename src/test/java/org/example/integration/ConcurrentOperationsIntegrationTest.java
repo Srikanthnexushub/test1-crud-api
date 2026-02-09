@@ -5,6 +5,7 @@ import org.example.dto.LoginResponse;
 import org.example.dto.UserUpdateRequest;
 import org.example.entity.UserEntity;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.example.service.UserService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +39,9 @@ class ConcurrentOperationsIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
+    @Autowired
     private UserService userService;
 
     @Autowired
@@ -47,6 +51,7 @@ class ConcurrentOperationsIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
         executorService = Executors.newFixedThreadPool(10);
     }
@@ -64,6 +69,7 @@ class ConcurrentOperationsIntegrationTest {
                 Thread.currentThread().interrupt();
             }
         }
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 

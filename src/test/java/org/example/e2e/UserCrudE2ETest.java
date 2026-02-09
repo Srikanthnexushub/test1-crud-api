@@ -3,6 +3,7 @@ package org.example.e2e;
 import com.microsoft.playwright.APIResponse;
 import org.example.entity.UserEntity;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,10 +21,14 @@ class UserCrudE2ETest extends BaseE2ETest {
     private UserRepository userRepository;
 
     @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @AfterEach
     void cleanup() {
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -39,6 +44,9 @@ class UserCrudE2ETest extends BaseE2ETest {
         Optional<UserEntity> user = userRepository.findByEmail("lifecycle@example.com");
         assertThat(user).isPresent();
         Long userId = user.get().getId();
+
+        // Verify email for test
+        verifyUserEmail("lifecycle@example.com");
 
         // 2. Login
         String loginBody = "{\"email\":\"lifecycle@example.com\",\"password\":\"password123\"}";
@@ -65,7 +73,8 @@ class UserCrudE2ETest extends BaseE2ETest {
         APIResponse deleteResponse = apiDelete("/users/" + userId);
         assertThat(deleteResponse.status()).isEqualTo(403);
 
-        // Delete directly via repository for verification
+        // Delete directly via repository for verification (delete tokens first)
+        verificationTokenRepository.deleteAll();
         userRepository.deleteById(userId);
 
         // Verify deletion
@@ -164,7 +173,8 @@ class UserCrudE2ETest extends BaseE2ETest {
         // Assert - DELETE requires ADMIN role, so expecting 403 Forbidden
         assertThat(response.status()).isEqualTo(403);
 
-        // Delete directly via repository for cleanup
+        // Delete directly via repository for cleanup (delete tokens first)
+        verificationTokenRepository.deleteAll();
         userRepository.deleteById(userId);
 
         // Verify deletion
@@ -253,7 +263,8 @@ class UserCrudE2ETest extends BaseE2ETest {
         APIResponse deleteResponse = apiDelete("/users/" + userId);
         assertThat(deleteResponse.status()).isEqualTo(403);
 
-        // Delete directly for verification
+        // Delete directly for verification (delete tokens first)
+        verificationTokenRepository.deleteAll();
         userRepository.deleteById(userId);
 
         // Verify final state
@@ -368,5 +379,15 @@ class UserCrudE2ETest extends BaseE2ETest {
         assertThat(finalUser.get().getEmail()).isEqualTo("multi@example.com");
         assertThat(passwordEncoder.matches("password789", finalUser.get().getPassword())).isTrue();
         assertThat(finalUser.get().getId()).isEqualTo(userId); // ID unchanged
+    }
+
+    /**
+     * Helper method to verify user email for testing purposes
+     */
+    private void verifyUserEmail(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.setEmailVerified(true);
+            userRepository.save(user);
+        });
     }
 }

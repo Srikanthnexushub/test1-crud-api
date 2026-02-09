@@ -8,6 +8,7 @@ import org.example.entity.Role;
 import org.example.entity.UserEntity;
 import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -43,6 +44,9 @@ class UserIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
+    @Autowired
     private RoleRepository roleRepository;
 
     @Autowired
@@ -54,12 +58,14 @@ class UserIntegrationTest {
     @BeforeEach
     void setUp() {
         // Clean database before each test
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
     @AfterEach
     void tearDown() {
         // Clean database after each test
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -75,13 +81,17 @@ class UserIntegrationTest {
                 .content(objectMapper.writeValueAsString(registerRequest)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.message").value("Registration successful"))
+            .andExpect(jsonPath("$.message").value("Registration successful. Please check your email to verify your account."))
             .andReturn();
 
         // Verify user is in database
         Optional<UserEntity> savedUser = userRepository.findByEmail("integration@example.com");
         assertThat(savedUser).isPresent();
         assertThat(savedUser.get().getEmail()).isEqualTo("integration@example.com");
+
+        // Verify email for test
+        savedUser.get().setEmailVerified(true);
+        userRepository.save(savedUser.get());
 
         // Act - Login
         LoginRequest loginRequest = new LoginRequest("integration@example.com", "password123");
@@ -207,6 +217,11 @@ class UserIntegrationTest {
                 .content(objectMapper.writeValueAsString(registerRequest)))
             .andExpect(status().isOk());
 
+        // Verify email for test
+        UserEntity user = userRepository.findByEmail("wrongpass@example.com").orElseThrow();
+        user.setEmailVerified(true);
+        userRepository.save(user);
+
         // Act - Try to login with wrong password
         LoginRequest loginRequest = new LoginRequest("wrongpass@example.com", "wrongpass");
         mockMvc.perform(post("/api/v1/users/login")
@@ -267,6 +282,13 @@ class UserIntegrationTest {
         // Verify all users are in database
         long count = userRepository.count();
         assertThat(count).isEqualTo(3);
+
+        // Verify emails for all users
+        for (int i = 1; i <= 3; i++) {
+            UserEntity user = userRepository.findByEmail("user" + i + "@example.com").orElseThrow();
+            user.setEmailVerified(true);
+            userRepository.save(user);
+        }
 
         // Login with each user
         for (int i = 1; i <= 3; i++) {
@@ -339,6 +361,10 @@ class UserIntegrationTest {
         mockMvc.perform(get("/api/v1/users/" + userId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.email").value("persist@example.com"));
+
+        // Verify email for test
+        savedUser.setEmailVerified(true);
+        userRepository.save(savedUser);
 
         // Login and verify credentials work
         LoginRequest loginRequest = new LoginRequest("persist@example.com", "password123");

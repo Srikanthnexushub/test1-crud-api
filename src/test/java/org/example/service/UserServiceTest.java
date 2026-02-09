@@ -54,6 +54,15 @@ class UserServiceTest {
     @Mock
     private SecurityProperties securityProperties;
 
+    @Mock
+    private VerificationTokenService verificationTokenService;
+
+    @Mock
+    private EmailService emailService;
+
+    @Mock
+    private TwoFactorService twoFactorService;
+
     @InjectMocks
     private UserService userService;
 
@@ -69,6 +78,7 @@ class UserServiceTest {
 
         testUser = new UserEntity("test@example.com", "hashed_password123");
         testUser.setId(1L);
+        testUser.setEmailVerified(true); // Set as verified for tests
 
         loginRequest = new LoginRequest("test@example.com", "password123");
 
@@ -95,6 +105,17 @@ class UserServiceTest {
         // Setup audit log service (no-op for tests)
         lenient().doNothing().when(auditLogService).logSuccess(anyString(), anyString(), any(), anyString());
         lenient().doNothing().when(auditLogService).logFailure(anyString(), anyString(), anyString());
+
+        // Setup verification token service
+        lenient().when(verificationTokenService.createEmailVerificationToken(any(UserEntity.class)))
+                .thenReturn("mock-verification-token");
+
+        // Setup email service (no-op for tests)
+        lenient().doNothing().when(emailService).sendVerificationEmail(any(UserEntity.class), anyString());
+        lenient().doNothing().when(emailService).sendPasswordResetEmail(any(UserEntity.class), anyString());
+
+        // Setup two factor service
+        lenient().when(twoFactorService.generateSecret()).thenReturn("mock-secret-key");
     }
 
     // ==================== LOGIN TESTS ====================
@@ -143,7 +164,7 @@ class UserServiceTest {
         LoginResponse response = userService.register(request);
 
         assertTrue(response.success());
-        assertEquals("Registration successful", response.message());
+        assertEquals("Registration successful. Please check your email to verify your account.", response.message());
         verify(userRepository, times(1)).save(any(UserEntity.class));
     }
 
@@ -239,10 +260,6 @@ class UserServiceTest {
         when(userRepository.save(any(UserEntity.class))).thenReturn(testUser);
 
         // Mock refresh token for null email
-        RefreshToken mockRefreshToken = new RefreshToken();
-        mockRefreshToken.setToken("mock-refresh-token-null");
-        when(refreshTokenService.createRefreshToken(null)).thenReturn(mockRefreshToken);
-
         // Service processes null email - validation should be at controller level
         LoginResponse response = userService.register(request);
 

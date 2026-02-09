@@ -2,6 +2,7 @@ package org.example.e2e;
 
 import com.microsoft.playwright.APIResponse;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,8 +16,12 @@ class LoginE2ETest extends BaseE2ETest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
     @AfterEach
     void cleanup() {
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -26,6 +31,9 @@ class LoginE2ETest extends BaseE2ETest {
         // Arrange - Register user first
         String registerBody = "{\"email\":\"login@example.com\",\"password\":\"password123\"}";
         apiPost("/users/register", registerBody);
+
+        // Verify email for test
+        verifyUserEmail("login@example.com");
 
         // Act - Login with same credentials
         String loginBody = "{\"email\":\"login@example.com\",\"password\":\"password123\"}";
@@ -57,6 +65,9 @@ class LoginE2ETest extends BaseE2ETest {
         // Arrange - Register user
         String registerBody = "{\"email\":\"wrongpass@example.com\",\"password\":\"correctpass\"}";
         apiPost("/users/register", registerBody);
+
+        // Verify email for test
+        verifyUserEmail("wrongpass@example.com");
 
         // Act - Try to login with wrong password
         String loginBody = "{\"email\":\"wrongpass@example.com\",\"password\":\"wrongpass\"}";
@@ -155,6 +166,9 @@ class LoginE2ETest extends BaseE2ETest {
         String registerBody = "{\"email\":\"case@example.com\",\"password\":\"Password123\"}";
         apiPost("/users/register", registerBody);
 
+        // Verify email for test
+        verifyUserEmail("case@example.com");
+
         // Act - Try login with different case
         String loginBody = "{\"email\":\"case@example.com\",\"password\":\"password123\"}";
         APIResponse response = apiPost("/users/login", loginBody);
@@ -170,6 +184,9 @@ class LoginE2ETest extends BaseE2ETest {
         // Arrange - Register user
         String registerBody = "{\"email\":\"perf@example.com\",\"password\":\"password123\"}";
         apiPost("/users/register", registerBody);
+
+        // Verify email for test
+        verifyUserEmail("perf@example.com");
 
         // Act
         String loginBody = "{\"email\":\"perf@example.com\",\"password\":\"password123\"}";
@@ -190,6 +207,9 @@ class LoginE2ETest extends BaseE2ETest {
         // Arrange - Register user
         String registerBody = "{\"email\":\"update@example.com\",\"password\":\"oldpass123\"}";
         APIResponse registerResponse = apiPost("/users/register", registerBody);
+
+        // Verify email for test
+        verifyUserEmail("update@example.com");
 
         // Get user ID from database
         Long userId = userRepository.findByEmail("update@example.com").get().getId();
@@ -214,6 +234,9 @@ class LoginE2ETest extends BaseE2ETest {
         String registerBody = "{\"email\":\"multi@example.com\",\"password\":\"password123\"}";
         apiPost("/users/register", registerBody);
 
+        // Verify email for test
+        verifyUserEmail("multi@example.com");
+
         String loginBody = "{\"email\":\"multi@example.com\",\"password\":\"password123\"}";
 
         // Act - Multiple login attempts
@@ -234,6 +257,9 @@ class LoginE2ETest extends BaseE2ETest {
         String registerBody = "{\"email\":\"special@example.com\",\"password\":\"P@ssw0rd!#$%\"}";
         apiPost("/users/register", registerBody);
 
+        // Verify email for test
+        verifyUserEmail("special@example.com");
+
         // Act
         String loginBody = "{\"email\":\"special@example.com\",\"password\":\"P@ssw0rd!#$%\"}";
         APIResponse response = apiPost("/users/login", loginBody);
@@ -253,7 +279,8 @@ class LoginE2ETest extends BaseE2ETest {
         // Get user ID from database
         Long userId = userRepository.findByEmail("delete@example.com").get().getId();
 
-        // Delete user directly from repository (DELETE endpoint requires ADMIN role)
+        // Delete verification tokens first, then user (DELETE endpoint requires ADMIN role)
+        verificationTokenRepository.deleteAll();
         userRepository.deleteById(userId);
 
         // Act - Try to login
@@ -277,5 +304,15 @@ class LoginE2ETest extends BaseE2ETest {
         // Assert
         // Should fail validation or user not found
         assertThat(response.status()).isIn(400, 404);
+    }
+
+    /**
+     * Helper method to verify user email for testing purposes
+     */
+    private void verifyUserEmail(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.setEmailVerified(true);
+            userRepository.save(user);
+        });
     }
 }

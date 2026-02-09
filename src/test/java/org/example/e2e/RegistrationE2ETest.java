@@ -2,6 +2,7 @@ package org.example.e2e;
 
 import com.microsoft.playwright.APIResponse;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,9 +16,13 @@ class RegistrationE2ETest extends BaseE2ETest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
     @AfterEach
     void cleanup() {
         // Clean up test data
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 

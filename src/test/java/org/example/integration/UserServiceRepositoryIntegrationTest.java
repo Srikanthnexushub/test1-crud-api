@@ -11,6 +11,7 @@ import org.example.exception.InvalidCredentialsException;
 import org.example.exception.ResourceNotFoundException;
 import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.example.security.JwtUtil;
 import org.example.service.AuditLogService;
 import org.example.service.EmailService;
@@ -55,6 +56,9 @@ class UserServiceRepositoryIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
+    @Autowired
     private TestEntityManager entityManager;
 
     private UserService userService;
@@ -63,7 +67,7 @@ class UserServiceRepositoryIntegrationTest {
     private JwtUtil jwtUtil;
     private AuditLogService auditLogService;
     private RefreshTokenService refreshTokenService;
-    private VerificationTokenService verificationTokenService;
+    private VerificationTokenService verificationTokenServiceMock;
     private EmailService emailService;
     private TwoFactorService twoFactorService;
     private SecurityProperties securityProperties;
@@ -71,6 +75,7 @@ class UserServiceRepositoryIntegrationTest {
     @BeforeEach
     void setUp() {
         // Clean database before each test
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
 
         // Create mocks for new dependencies
@@ -79,7 +84,7 @@ class UserServiceRepositoryIntegrationTest {
         jwtUtil = mock(JwtUtil.class);
         auditLogService = mock(AuditLogService.class);
         refreshTokenService = mock(RefreshTokenService.class);
-        verificationTokenService = mock(VerificationTokenService.class);
+        verificationTokenServiceMock = mock(VerificationTokenService.class);
         emailService = mock(EmailService.class);
         twoFactorService = mock(TwoFactorService.class);
         securityProperties = mock(SecurityProperties.class);
@@ -98,7 +103,7 @@ class UserServiceRepositoryIntegrationTest {
         when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
 
         // Mock verification token service
-        when(verificationTokenService.createEmailVerificationToken(any())).thenReturn("mock-verification-token");
+        when(verificationTokenServiceMock.createEmailVerificationToken(any())).thenReturn("mock-verification-token");
 
         // Mock security properties
         when(securityProperties.getMaxFailedAttempts()).thenReturn(5);
@@ -107,7 +112,7 @@ class UserServiceRepositoryIntegrationTest {
         // Manually instantiate UserService with all dependencies
         userService = new UserService(userRepository, roleRepository, passwordEncoder,
                                      jwtUtil, auditLogService, refreshTokenService,
-                                     verificationTokenService, emailService, twoFactorService,
+                                     verificationTokenServiceMock, emailService, twoFactorService,
                                      securityProperties);
     }
 
@@ -337,6 +342,8 @@ class UserServiceRepositoryIntegrationTest {
     void testUpdateUser_UpdatePassword_PersistsToDatabase() {
         // Arrange
         UserEntity user = userRepository.save(createUserEntity("user@example.com", "oldPassword"));
+        user.setEmailVerified(true); // Verify email for test
+        userRepository.save(user);
         entityManager.flush();
         Long userId = user.getId();
 
@@ -457,6 +464,10 @@ class UserServiceRepositoryIntegrationTest {
         assertThat(registeredUser).isPresent();
         Long userId = registeredUser.get().getId();
 
+        // Verify email for test
+        registeredUser.get().setEmailVerified(true);
+        userRepository.save(registeredUser.get());
+
         // Login
         LoginRequest loginRequest = createLoginRequest("lifecycle@example.com", "password123");
         LoginResponse loginResponse = userService.login(loginRequest);
@@ -492,6 +503,11 @@ class UserServiceRepositoryIntegrationTest {
         // Register
         LoginRequest registerRequest = createLoginRequest("workflow@example.com", "correctPassword");
         userService.register(registerRequest);
+
+        // Verify email for test
+        UserEntity user = userRepository.findByEmail("workflow@example.com").orElseThrow();
+        user.setEmailVerified(true);
+        userRepository.save(user);
 
         // Failed login with wrong password
         LoginRequest wrongLoginRequest = createLoginRequest("workflow@example.com", "wrongPassword");

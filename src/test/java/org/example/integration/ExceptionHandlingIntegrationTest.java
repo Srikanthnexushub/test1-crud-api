@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.dto.LoginRequest;
 import org.example.entity.UserEntity;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,15 +43,20 @@ class ExceptionHandlingIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
     @AfterEach
     void tearDown() {
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -225,6 +231,8 @@ class ExceptionHandlingIntegrationTest {
     void testBusinessLogicError_InvalidPassword_Returns400() throws Exception {
         // Arrange - Register user
         UserEntity user = userRepository.save(new UserEntity("user@example.com", "correctPassword"));
+        user.setEmailVerified(true);
+        userRepository.save(user);
 
         LoginRequest request = new LoginRequest("user@example.com", "wrongPassword");
 

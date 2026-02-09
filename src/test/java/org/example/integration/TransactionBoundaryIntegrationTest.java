@@ -8,6 +8,7 @@ import org.example.entity.Role;
 import org.example.entity.UserEntity;
 import org.example.repository.RoleRepository;
 import org.example.repository.UserRepository;
+import org.example.repository.VerificationTokenRepository;
 import org.example.security.JwtUtil;
 import org.example.service.AuditLogService;
 import org.example.service.EmailService;
@@ -55,6 +56,9 @@ class TransactionBoundaryIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
+    @Autowired
     private TestEntityManager entityManager;
 
     private UserService userService;
@@ -63,13 +67,14 @@ class TransactionBoundaryIntegrationTest {
     private JwtUtil jwtUtil;
     private AuditLogService auditLogService;
     private RefreshTokenService refreshTokenService;
-    private VerificationTokenService verificationTokenService;
+    private VerificationTokenService verificationTokenServiceMock;
     private EmailService emailService;
     private TwoFactorService twoFactorService;
     private SecurityProperties securityProperties;
 
     @BeforeEach
     void setUp() {
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
         entityManager.flush();
         entityManager.clear();
@@ -80,7 +85,7 @@ class TransactionBoundaryIntegrationTest {
         jwtUtil = mock(JwtUtil.class);
         auditLogService = mock(AuditLogService.class);
         refreshTokenService = mock(RefreshTokenService.class);
-        verificationTokenService = mock(VerificationTokenService.class);
+        verificationTokenServiceMock = mock(VerificationTokenService.class);
         emailService = mock(EmailService.class);
         twoFactorService = mock(TwoFactorService.class);
         securityProperties = mock(SecurityProperties.class);
@@ -99,7 +104,7 @@ class TransactionBoundaryIntegrationTest {
         when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken);
 
         // Mock verification token service
-        when(verificationTokenService.createEmailVerificationToken(org.mockito.ArgumentMatchers.any())).thenReturn("mock-verification-token");
+        when(verificationTokenServiceMock.createEmailVerificationToken(org.mockito.ArgumentMatchers.any())).thenReturn("mock-verification-token");
 
         // Mock security properties
         when(securityProperties.getMaxFailedAttempts()).thenReturn(5);
@@ -108,7 +113,7 @@ class TransactionBoundaryIntegrationTest {
         // Manually instantiate UserService with all dependencies
         userService = new UserService(userRepository, roleRepository, passwordEncoder,
                                      jwtUtil, auditLogService, refreshTokenService,
-                                     verificationTokenService, emailService, twoFactorService,
+                                     verificationTokenServiceMock, emailService, twoFactorService,
                                      securityProperties);
     }
 
@@ -357,6 +362,11 @@ class TransactionBoundaryIntegrationTest {
 
         UserEntity savedUser = userRepository.findByEmail("sequential@example.com").orElseThrow();
         Long userId = savedUser.getId();
+
+        // Verify email for test
+        savedUser.setEmailVerified(true);
+        userRepository.save(savedUser);
+        entityManager.flush();
 
         // Act - Multiple sequential operations
         // 1. Login
