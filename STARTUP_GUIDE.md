@@ -31,10 +31,10 @@ After starting services:
 
 | Service | URL |
 |---------|-----|
-| **Frontend** | http://localhost:3000 |
-| **Backend API** | http://localhost:8080 |
-| **API Health** | http://localhost:8080/actuator/health |
-| **Swagger Docs** | http://localhost:8080/swagger-ui.html |
+| **Backend API** | http://localhost:3000 |
+| **API Health** | http://localhost:3000/actuator/health |
+| **Swagger Docs** | http://localhost:3000/swagger-ui.html |
+| **Frontend** | http://localhost:5173 (Vite dev server) |
 
 ## 👤 Admin Login
 
@@ -85,11 +85,11 @@ pg_ctl start -D /Library/PostgreSQL/18/data
 
 ### Port already in use?
 ```bash
-# Check what's using port 8080
-lsof -i :8080
+# Check what's using port 3000
+lsof -i :3000
 
-# Kill process on port 8080
-kill $(lsof -t -i:8080)
+# Kill process on port 3000
+kill $(lsof -t -i:3000)
 ```
 
 ### Services won't start?

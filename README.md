@@ -21,6 +21,9 @@ A production-ready, Fortune 100 enterprise-grade RESTful CRUD API built with Spr
 - **Password Visibility Toggle** on all authentication forms for improved UX
 
 ### Security & Authentication
+- ✅ **Email Verification** - Users must verify email before login (blocking)
+- ✅ **Two-Factor Authentication (2FA)** - TOTP-based with QR codes (Google Authenticator compatible)
+- ✅ **Password Reset** - Secure email-based password recovery
 - ✅ **JWT Authentication** with refresh token pattern
 - ✅ **Role-Based Access Control (RBAC)** - USER, ADMIN, MANAGER roles
 - ✅ **BCrypt Password Hashing**
@@ -28,6 +31,7 @@ A production-ready, Fortune 100 enterprise-grade RESTful CRUD API built with Spr
 - ✅ **Account Locking** - Brute force protection after 5 failed attempts
 - ✅ **OWASP Security Headers** - CSP, HSTS, X-Frame-Options, etc.
 - ✅ **CORS Configuration** with origin validation
+- ✅ **Backup Codes** - Recovery codes for 2FA
 
 ### Observability & Monitoring
 - ✅ **Comprehensive Audit Logging** - All user actions tracked
@@ -81,10 +85,10 @@ This will automatically:
 - ✅ Display access URLs and credentials
 
 **Service URLs:**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8080
-- Swagger UI: http://localhost:8080/swagger-ui.html
-- Health Check: http://localhost:8080/actuator/health
+- Backend API: http://localhost:3000
+- Swagger UI: http://localhost:3000/swagger-ui.html
+- Health Check: http://localhost:3000/actuator/health
+- Frontend: http://localhost:5173 (if using Vite)
 
 **Admin Credentials:**
 - Email: `admin@example.com`
@@ -119,8 +123,8 @@ docker-compose down -v
 ```
 
 **Docker Service Access:**
-- API: http://localhost:8080
-- Frontend: http://localhost:3000
+- API: http://localhost:3000
+- Frontend: http://localhost:5173
 - PostgreSQL: localhost:5434 (Docker)
 - Database: cruddb
 
@@ -146,8 +150,8 @@ npm run dev
 ```
 
 **Local Service Access:**
-- API: http://localhost:8080
-- Frontend: http://localhost:3000
+- API: http://localhost:3000
+- Frontend: http://localhost:5173
 - PostgreSQL: localhost:5433 (Local)
 - Database: Crud_db
 
@@ -262,7 +266,7 @@ JaCoCo Coverage: 60% instruction, 34% branch
 
 ### Base URL
 ```
-http://localhost:8080/api/v1
+http://localhost:3000/api/v1
 ```
 
 ### Authentication Endpoints
@@ -275,6 +279,33 @@ Content-Type: application/json
 {
   "email": "user@example.com",
   "password": "securePassword123"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Registration successful. Please check your email to verify your account."
+}
+```
+
+#### Verify Email
+```http
+POST /api/v1/users/verify-email?token=<verification-token>
+
+Response:
+{
+  "success": true,
+  "message": "Email verified successfully. You can now login."
+}
+```
+
+#### Resend Verification Email
+```http
+POST /api/v1/users/resend-verification
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
 }
 ```
 
@@ -304,6 +335,104 @@ Content-Type: application/json
 
 {
   "refreshToken": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### Password Reset Endpoints
+
+#### Request Password Reset
+```http
+POST /api/v1/users/forgot-password
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Password reset email sent. Please check your inbox."
+}
+```
+
+#### Reset Password
+```http
+POST /api/v1/users/reset-password
+Content-Type: application/json
+
+{
+  "token": "<reset-token>",
+  "newPassword": "newSecurePassword123"
+}
+```
+
+### Two-Factor Authentication Endpoints
+
+#### Setup 2FA (Get QR Code)
+```http
+POST /api/v1/auth/2fa/setup
+Authorization: Bearer {token}
+
+Response:
+{
+  "success": true,
+  "qrCodeUrl": "data:image/png;base64,...",
+  "secret": "BASE32ENCODEDSECRET",
+  "message": "Scan QR code with authenticator app"
+}
+```
+
+#### Enable 2FA
+```http
+POST /api/v1/auth/2fa/enable
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "verificationCode": "123456"
+}
+
+Response:
+{
+  "success": true,
+  "backupCodes": ["code1", "code2", ...],
+  "message": "2FA enabled successfully. Save your backup codes."
+}
+```
+
+#### Verify 2FA Code (During Login)
+```http
+POST /api/v1/auth/2fa/verify
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+#### Disable 2FA
+```http
+POST /api/v1/auth/2fa/disable
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "password": "currentPassword"
+}
+```
+
+#### Regenerate Backup Codes
+```http
+POST /api/v1/auth/2fa/backup-codes
+Authorization: Bearer {token}
+
+Response:
+{
+  "success": true,
+  "backupCodes": ["new1", "new2", ...],
+  "message": "New backup codes generated"
 }
 ```
 
@@ -358,7 +487,7 @@ Authorization: Bearer {token}
 ### Swagger UI
 Access interactive API documentation at:
 ```
-http://localhost:8080/swagger-ui/index.html
+http://localhost:3000/swagger-ui/index.html
 ```
 
 ## 🏗️ Architecture
@@ -547,6 +676,7 @@ Response:
   "status": "UP",
   "components": {
     "db": { "status": "UP" },
+    "mail": { "status": "UP" },  // if email configured
     "diskSpace": { "status": "UP" },
     "ping": { "status": "UP" }
   }
@@ -756,7 +886,7 @@ For support, email support@example.com or open an issue in the GitHub repository
 
 **Built with ❤️ using Spring Boot and modern enterprise practices**
 
-**Status**: ✅ Production Ready | 🧪 279 Tests Passing | 🔒 Enterprise Security | 🚀 Docker Ready | 🏗️ Immutable Architecture
+**Status**: ✅ Production Ready | 🧪 279 Tests Passing | 🔒 Enterprise Security | 📧 Email Verification | 🔐 2FA Enabled | 🚀 Docker Ready | 🏗️ Immutable Architecture
 
 ## 🔐 Security Notice
 
